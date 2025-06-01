@@ -54,7 +54,8 @@ export const SellBook = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase.from("books").insert({
+      // Create book listing first (without payment)
+      const { data: book, error } = await supabase.from("books").insert({
         seller_id: user.id,
         title: formData.title,
         author: formData.author,
@@ -65,15 +66,28 @@ export const SellBook = () => {
         location_address: formData.locationAddress || null,
         postal_code: formData.postalCode || null,
         images: images,
-        status: "available",
-        listing_paid: false, // Will be updated after Stripe payment
-      });
+        status: "inactive", // Start as inactive until payment
+        listing_paid: false,
+      }).select().single();
 
       if (error) throw error;
 
+      // Create Stripe payment session for security deposit
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+        'create-listing-payment',
+        {
+          body: { bookId: book.id }
+        }
+      );
+
+      if (paymentError) throw paymentError;
+
+      // Redirect to Stripe checkout
+      window.open(paymentData.url, '_blank');
+
       toast({
         title: "Book listed successfully!",
-        description: "Your book is now available for purchase. Complete payment to activate listing.",
+        description: "Complete the ₹100 security deposit payment to activate your listing.",
       });
 
       // Reset form
@@ -269,18 +283,21 @@ export const SellBook = () => {
               </div>
             </div>
 
-            {/* Listing Fee Notice */}
+            {/* Security Deposit Notice */}
             <div className="bg-blue-50 p-4 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Listing Fee:</strong> ₹50 (payable after listing creation)
+                <strong>Security Deposit:</strong> ₹100 (refundable when book is sold)
               </p>
               <p className="text-sm text-blue-600 mt-1">
-                Your book will be visible to buyers after payment confirmation.
+                When your book sells, you'll receive: Book Price + ₹100 Security Deposit - ₹20 Platform Fee
+              </p>
+              <p className="text-sm text-blue-600 font-semibold mt-2">
+                Example: Book sells for ₹250 → You get ₹330 (₹250 + ₹100 - ₹20)
               </p>
             </div>
 
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Creating Listing..." : "List Book"}
+              {loading ? "Creating Listing..." : "List Book & Pay Security Deposit"}
             </Button>
           </form>
         </CardContent>

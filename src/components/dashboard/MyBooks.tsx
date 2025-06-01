@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Library, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import { Library, Edit, Trash2, Eye, EyeOff, CreditCard } from "lucide-react";
 
 interface Book {
   id: string;
@@ -17,6 +17,7 @@ interface Book {
   description?: string;
   status: string;
   listing_paid: boolean;
+  listing_payment_id?: string;
   created_at: string;
   images: string[];
 }
@@ -107,6 +108,28 @@ export const MyBooks = () => {
     }
   };
 
+  const handlePaySecurityDeposit = async (bookId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'create-listing-payment',
+        {
+          body: { bookId }
+        }
+      );
+
+      if (error) throw error;
+
+      // Open Stripe checkout in new tab
+      window.open(data.url, '_blank');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to create payment session",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: string, listingPaid: boolean) => {
     if (!listingPaid) return "bg-orange-100 text-orange-800";
     switch (status) {
@@ -119,7 +142,7 @@ export const MyBooks = () => {
   };
 
   const getStatusText = (status: string, listingPaid: boolean) => {
-    if (!listingPaid) return "Payment Pending";
+    if (!listingPaid) return "Security Deposit Pending";
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
@@ -197,11 +220,19 @@ export const MyBooks = () => {
 
                 {!book.listing_paid && (
                   <div className="bg-orange-50 p-3 rounded-lg">
-                    <p className="text-sm text-orange-800">
-                      Complete payment (₹50) to activate this listing
+                    <p className="text-sm text-orange-800 mb-2">
+                      Pay ₹100 security deposit to activate this listing
                     </p>
-                    <Button size="sm" className="mt-2 w-full">
-                      Pay Now
+                    <p className="text-xs text-orange-600 mb-3">
+                      You'll get ₹100 + book price - ₹20 platform fee when sold
+                    </p>
+                    <Button 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => handlePaySecurityDeposit(book.id)}
+                    >
+                      <CreditCard className="h-4 w-4 mr-1" />
+                      Pay Security Deposit
                     </Button>
                   </div>
                 )}
