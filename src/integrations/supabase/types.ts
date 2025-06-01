@@ -9,7 +9,263 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      books: {
+        Row: {
+          author: string
+          condition: string
+          created_at: string | null
+          description: string | null
+          id: string
+          images: string[] | null
+          latitude: number | null
+          listing_paid: boolean | null
+          listing_payment_id: string | null
+          location_address: string | null
+          longitude: number | null
+          postal_code: string | null
+          price_range: number
+          seller_id: string | null
+          status: string | null
+          title: string
+          transfer_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          author: string
+          condition: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          latitude?: number | null
+          listing_paid?: boolean | null
+          listing_payment_id?: string | null
+          location_address?: string | null
+          longitude?: number | null
+          postal_code?: string | null
+          price_range: number
+          seller_id?: string | null
+          status?: string | null
+          title: string
+          transfer_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          author?: string
+          condition?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          latitude?: number | null
+          listing_paid?: boolean | null
+          listing_payment_id?: string | null
+          location_address?: string | null
+          longitude?: number | null
+          postal_code?: string | null
+          price_range?: number
+          seller_id?: string | null
+          status?: string | null
+          title?: string
+          transfer_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "books_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          purchase_request_id: string | null
+          sender_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          purchase_request_id?: string | null
+          sender_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          purchase_request_id?: string | null
+          sender_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          read: boolean | null
+          related_id: string | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          read?: boolean | null
+          related_id?: string | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          read?: boolean | null
+          related_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          latitude: number | null
+          location_address: string | null
+          longitude: number | null
+          phone: string | null
+          postal_code: string | null
+          registration_paid: boolean | null
+          registration_payment_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          full_name?: string | null
+          id: string
+          latitude?: number | null
+          location_address?: string | null
+          longitude?: number | null
+          phone?: string | null
+          postal_code?: string | null
+          registration_paid?: boolean | null
+          registration_payment_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          latitude?: number | null
+          location_address?: string | null
+          longitude?: number | null
+          phone?: string | null
+          postal_code?: string | null
+          registration_paid?: boolean | null
+          registration_payment_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      purchase_requests: {
+        Row: {
+          book_id: string | null
+          buyer_id: string | null
+          created_at: string | null
+          id: string
+          message: string | null
+          offered_price: number
+          seller_id: string | null
+          status: string | null
+          transfer_mode: string
+          updated_at: string | null
+        }
+        Insert: {
+          book_id?: string | null
+          buyer_id?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          offered_price: number
+          seller_id?: string | null
+          status?: string | null
+          transfer_mode: string
+          updated_at?: string | null
+        }
+        Update: {
+          book_id?: string | null
+          buyer_id?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          offered_price?: number
+          seller_id?: string | null
+          status?: string | null
+          transfer_mode?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_requests_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_requests_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_requests_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
