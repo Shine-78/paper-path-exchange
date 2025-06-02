@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User as UserIcon, MapPin, CreditCard } from "lucide-react";
+import { User as UserIcon, MapPin } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -16,7 +16,8 @@ interface Profile {
   phone?: string;
   location_address?: string;
   postal_code?: string;
-  registration_paid: boolean;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface ProfileProps {
@@ -27,6 +28,7 @@ export const Profile = ({ user }: ProfileProps) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const { toast } = useToast();
 
   const fetchProfile = async () => {
@@ -56,6 +58,40 @@ export const Profile = ({ user }: ProfileProps) => {
     fetchProfile();
   }, [user]);
 
+  const getCurrentLocation = () => {
+    setGettingLocation(true);
+    if (!navigator.geolocation) {
+      toast({
+        title: "Error",
+        description: "Geolocation is not supported by this browser",
+        variant: "destructive",
+      });
+      setGettingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setProfile(prev => prev ? { ...prev, latitude, longitude } : null);
+        setGettingLocation(false);
+        toast({
+          title: "Success",
+          description: "Location updated successfully",
+        });
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        toast({
+          title: "Error",
+          description: "Failed to get current location",
+          variant: "destructive",
+        });
+        setGettingLocation(false);
+      }
+    );
+  };
+
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
@@ -69,6 +105,8 @@ export const Profile = ({ user }: ProfileProps) => {
           phone: profile.phone,
           location_address: profile.location_address,
           postal_code: profile.postal_code,
+          latitude: profile.latitude,
+          longitude: profile.longitude,
         })
         .eq("id", user.id);
 
@@ -109,32 +147,6 @@ export const Profile = ({ user }: ProfileProps) => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Registration Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <CreditCard className="h-5 w-5" />
-            <span>Account Status</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {profile.registration_paid ? (
-            <div className="bg-green-50 p-4 rounded-lg">
-              <p className="text-green-800 font-semibold">✓ Registration fee paid</p>
-              <p className="text-green-600 text-sm">Your account is fully activated</p>
-            </div>
-          ) : (
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <p className="text-orange-800 font-semibold">⚠ Registration fee pending</p>
-              <p className="text-orange-600 text-sm mb-3">
-                Complete your ₹20 registration payment to access all features
-              </p>
-              <Button>Pay Registration Fee</Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Profile Form */}
       <Card>
         <CardHeader>
@@ -193,6 +205,24 @@ export const Profile = ({ user }: ProfileProps) => {
                 value={profile.postal_code || ""}
                 onChange={(e) => setProfile({ ...profile, postal_code: e.target.value })}
               />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={getCurrentLocation}
+                disabled={gettingLocation}
+                className="flex items-center space-x-2"
+              >
+                <MapPin className="h-4 w-4" />
+                <span>{gettingLocation ? "Getting Location..." : "Get Current Location"}</span>
+              </Button>
+              {profile.latitude && profile.longitude && (
+                <span className="text-sm text-green-600">
+                  ✓ Location saved
+                </span>
+              )}
             </div>
 
             <Button type="submit" disabled={saving} className="w-full">

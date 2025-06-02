@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Check, X, Clock } from "lucide-react";
+import { ChatModal } from "./ChatModal";
 
 interface PurchaseRequest {
   id: string;
@@ -32,12 +33,16 @@ export const Requests = () => {
   const [sentRequests, setSentRequests] = useState<PurchaseRequest[]>([]);
   const [receivedRequests, setReceivedRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selectedChatRequest, setSelectedChatRequest] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchRequests = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+      
+      setCurrentUserId(user.id);
 
       // Fetch sent requests
       const { data: sent, error: sentError } = await supabase
@@ -190,14 +195,18 @@ export const Requests = () => {
         {request.status === "accepted" && (
           <div className="bg-green-50 p-3 rounded-lg">
             <p className="text-sm text-green-800">
-              Request accepted! Contact the {type === "sent" ? "seller" : "buyer"} to arrange pickup/delivery.
+              Request accepted! Use chat to arrange pickup/delivery.
             </p>
           </div>
         )}
 
         <div className="flex justify-between text-xs text-gray-500">
           <span>{new Date(request.created_at).toLocaleDateString()}</span>
-          <Button variant="ghost" size="sm">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setSelectedChatRequest(request.id)}
+          >
             <MessageSquare className="h-4 w-4 mr-1" />
             Chat
           </Button>
@@ -271,6 +280,15 @@ export const Requests = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {selectedChatRequest && currentUserId && (
+        <ChatModal
+          isOpen={!!selectedChatRequest}
+          onClose={() => setSelectedChatRequest(null)}
+          requestId={selectedChatRequest}
+          currentUserId={currentUserId}
+        />
+      )}
     </div>
   );
 };

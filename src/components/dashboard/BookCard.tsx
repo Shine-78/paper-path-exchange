@@ -1,12 +1,11 @@
 
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { MapPin, User, MessageSquare, Package, Truck } from "lucide-react";
+import { MapPin, User } from "lucide-react";
 import { PurchaseRequestModal } from "./PurchaseRequestModal";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Book {
   id: string;
@@ -30,8 +29,15 @@ interface BookCardProps {
 }
 
 export const BookCard = ({ book }: BookCardProps) => {
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-  const { toast } = useToast();
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Get current user
+  useState(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id || null);
+    });
+  });
 
   const getConditionColor = (condition: string) => {
     switch (condition) {
@@ -43,22 +49,13 @@ export const BookCard = ({ book }: BookCardProps) => {
     }
   };
 
-  const getTransferIcon = (type: string) => {
-    if (type.includes("self-transfer")) return <Package className="h-4 w-4" />;
-    if (type.includes("shipping")) return <Truck className="h-4 w-4" />;
-    return <Package className="h-4 w-4" />;
-  };
+  const canRequestBook = currentUserId && currentUserId !== book.seller_id;
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow duration-200">
+      <Card className="hover:shadow-lg transition-shadow">
         <CardHeader className="pb-3">
-          <div className="flex justify-between items-start">
-            <CardTitle className="text-lg line-clamp-2">{book.title}</CardTitle>
-            <Badge variant="secondary" className="ml-2">
-              ₹{book.price_range}
-            </Badge>
-          </div>
+          <CardTitle className="text-lg line-clamp-2">{book.title}</CardTitle>
           <p className="text-sm text-gray-600">by {book.author}</p>
         </CardHeader>
         
@@ -74,56 +71,65 @@ export const BookCard = ({ book }: BookCardProps) => {
             </div>
           ) : (
             <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-              <span className="text-gray-400 text-sm">No image available</span>
+              <span className="text-gray-400 text-sm">No image</span>
             </div>
           )}
 
-          {/* Book Details */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-semibold text-green-600">₹{book.price_range}</span>
               <Badge className={getConditionColor(book.condition)}>
                 {book.condition.charAt(0).toUpperCase() + book.condition.slice(1)}
               </Badge>
-              <div className="flex items-center space-x-1 text-sm text-gray-600">
-                {getTransferIcon(book.transfer_type)}
-                <span>{book.transfer_type.replace("-", " ")}</span>
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Transfer:</span>
+              <span className="capitalize">{book.transfer_type.replace("-", " ")}</span>
+            </div>
+            
+            {book.profiles?.full_name && (
+              <div className="flex items-center text-sm text-gray-600">
+                <User className="h-4 w-4 mr-1" />
+                <span>{book.profiles.full_name}</span>
               </div>
-            </div>
-
-            {book.description && (
-              <p className="text-sm text-gray-600 line-clamp-2">{book.description}</p>
             )}
-
-            {/* Seller Info */}
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <User className="h-4 w-4" />
-              <span>{book.profiles?.full_name || "Anonymous"}</span>
-            </div>
-
-            {book.profiles?.location_address && (
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <MapPin className="h-4 w-4" />
-                <span className="line-clamp-1">{book.profiles.location_address}</span>
+            
+            {(book.location_address || book.profiles?.location_address) && (
+              <div className="flex items-center text-sm text-gray-600">
+                <MapPin className="h-4 w-4 mr-1" />
+                <span>{book.location_address || book.profiles?.location_address}</span>
               </div>
             )}
           </div>
 
-          {/* Action Button */}
-          <Button
-            onClick={() => setShowPurchaseModal(true)}
-            className="w-full"
-          >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Send Request
-          </Button>
+          {book.description && (
+            <p className="text-sm text-gray-700 line-clamp-3">{book.description}</p>
+          )}
+
+          {canRequestBook ? (
+            <Button 
+              onClick={() => setIsRequestModalOpen(true)} 
+              className="w-full"
+            >
+              Request to Buy
+            </Button>
+          ) : (
+            <Button disabled className="w-full">
+              {currentUserId === book.seller_id ? "Your Book" : "Login to Request"}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
-      <PurchaseRequestModal
-        book={book}
-        isOpen={showPurchaseModal}
-        onClose={() => setShowPurchaseModal(false)}
-      />
+      {canRequestBook && (
+        <PurchaseRequestModal
+          isOpen={isRequestModalOpen}
+          onClose={() => setIsRequestModalOpen(false)}
+          book={book}
+          sellerId={book.seller_id}
+        />
+      )}
     </>
   );
 };

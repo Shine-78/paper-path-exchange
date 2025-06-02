@@ -7,99 +7,150 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Upload, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BookPlus, Upload, MapPin } from "lucide-react";
 
 export const SellBook = () => {
-  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     author: "",
-    condition: "good",
-    priceRange: 20,
-    transferType: "both",
+    condition: "",
+    price_range: "",
+    transfer_type: "",
     description: "",
-    locationAddress: "",
-    postalCode: "",
+    location_address: "",
+    postal_code: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
   });
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<File[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const { toast } = useToast();
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const getCurrentLocation = () => {
+    setGettingLocation(true);
+    if (!navigator.geolocation) {
+      toast({
+        title: "Error",
+        description: "Geolocation is not supported by this browser",
+        variant: "destructive",
+      });
+      setGettingLocation(false);
+      return;
+    }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    // For demo purposes, we'll use placeholder images
-    // In production, you'd upload to Supabase storage
-    const newImages = Array.from(files).map((file, index) => 
-      `https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop&auto=format&q=60`
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setFormData(prev => ({ ...prev, latitude, longitude }));
+        setGettingLocation(false);
+        toast({
+          title: "Success",
+          description: "Location updated successfully",
+        });
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        toast({
+          title: "Error",
+          description: "Failed to get current location",
+          variant: "destructive",
+        });
+        setGettingLocation(false);
+      }
     );
-    
-    setImages(prev => [...prev, ...newImages].slice(0, 3));
   };
 
-  const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 5) {
+      toast({
+        title: "Error",
+        description: "Maximum 5 images allowed",
+        variant: "destructive",
+      });
+      return;
+    }
+    setImages(files);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (!formData.title || !formData.author || !formData.condition || !formData.price_range || !formData.transfer_type) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Create book listing first (without payment)
-      const { data: book, error } = await supabase.from("books").insert({
-        seller_id: user.id,
-        title: formData.title,
-        author: formData.author,
-        condition: formData.condition,
-        price_range: formData.priceRange,
-        transfer_type: formData.transferType,
-        description: formData.description || null,
-        location_address: formData.locationAddress || null,
-        postal_code: formData.postalCode || null,
-        images: images,
-        status: "inactive", // Start as inactive until payment
-        listing_paid: false,
-      }).select().single();
+      // Upload images if any
+      const imageUrls: string[] = [];
+      for (const image of images) {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('book-images')
+          .upload(fileName, image);
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          // Continue without image if upload fails
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('book-images')
+            .getPublicUrl(fileName);
+          imageUrls.push(publicUrl);
+        }
+      }
+
+      // Create book listing
+      const { error } = await supabase
+        .from("books")
+        .insert({
+          title: formData.title,
+          author: formData.author,
+          condition: formData.condition,
+          price_range: parseInt(formData.price_range),
+          transfer_type: formData.transfer_type,
+          description: formData.description,
+          location_address: formData.location_address,
+          postal_code: formData.postal_code,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          seller_id: user.id,
+          images: imageUrls,
+          status: "draft", // Book starts as draft until security deposit is paid
+          listing_paid: false,
+        });
 
       if (error) throw error;
 
-      // Create Stripe payment session for security deposit
-      const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
-        'create-listing-payment',
-        {
-          body: { bookId: book.id }
-        }
-      );
-
-      if (paymentError) throw paymentError;
-
-      // Redirect to Stripe checkout
-      window.open(paymentData.url, '_blank');
-
       toast({
-        title: "Book listed successfully!",
-        description: "Complete the ₹100 security deposit payment to activate your listing.",
+        title: "Success",
+        description: "Book listed successfully! Pay security deposit to activate.",
       });
 
       // Reset form
       setFormData({
         title: "",
         author: "",
-        condition: "good",
-        priceRange: 20,
-        transferType: "both",
+        condition: "",
+        price_range: "",
+        transfer_type: "",
         description: "",
-        locationAddress: "",
-        postalCode: "",
+        location_address: "",
+        postal_code: "",
+        latitude: null,
+        longitude: null,
       });
       setImages([]);
     } catch (error: any) {
@@ -118,20 +169,20 @@ export const SellBook = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Plus className="h-5 w-5" />
-            <span>List Your Book</span>
+            <BookPlus className="h-5 w-5" />
+            <span>List a Book for Sale</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Book Details */}
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label htmlFor="title">Book Title *</Label>
                 <Input
                   id="title"
                   value={formData.title}
-                  onChange={(e) => handleInputChange("title", e.target.value)}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Enter book title"
                   required
                 />
               </div>
@@ -140,164 +191,137 @@ export const SellBook = () => {
                 <Input
                   id="author"
                   value={formData.author}
-                  onChange={(e) => handleInputChange("author", e.target.value)}
+                  onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+                  placeholder="Enter author name"
                   required
                 />
               </div>
             </div>
 
-            {/* Condition */}
-            <div>
-              <Label>Condition *</Label>
-              <RadioGroup
-                value={formData.condition}
-                onValueChange={(value) => handleInputChange("condition", value)}
-                className="flex flex-wrap gap-4 mt-2"
-              >
-                {["excellent", "good", "fair", "poor"].map((condition) => (
-                  <div key={condition} className="flex items-center space-x-2">
-                    <RadioGroupItem value={condition} id={condition} />
-                    <Label htmlFor={condition} className="capitalize">
-                      {condition}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="condition">Condition *</Label>
+                <Select value={formData.condition} onValueChange={(value) => setFormData({ ...formData, condition: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select condition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="excellent">Excellent</SelectItem>
+                    <SelectItem value="good">Good</SelectItem>
+                    <SelectItem value="fair">Fair</SelectItem>
+                    <SelectItem value="poor">Poor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="price_range">Price (₹) *</Label>
+                <Select value={formData.price_range} onValueChange={(value) => setFormData({ ...formData, price_range: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select price range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="20">₹20</SelectItem>
+                    <SelectItem value="35">₹35</SelectItem>
+                    <SelectItem value="50">₹50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Price Range */}
             <div>
-              <Label>Price Range *</Label>
-              <RadioGroup
-                value={formData.priceRange.toString()}
-                onValueChange={(value) => handleInputChange("priceRange", Number(value))}
-                className="flex gap-4 mt-2"
-              >
-                {[20, 35, 50].map((price) => (
-                  <div key={price} className="flex items-center space-x-2">
-                    <RadioGroupItem value={price.toString()} id={`price-${price}`} />
-                    <Label htmlFor={`price-${price}`}>₹{price}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
+              <Label htmlFor="transfer_type">Transfer Type *</Label>
+              <Select value={formData.transfer_type} onValueChange={(value) => setFormData({ ...formData, transfer_type: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select transfer type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pickup-only">Pickup Only</SelectItem>
+                  <SelectItem value="delivery-only">Delivery Only</SelectItem>
+                  <SelectItem value="both">Both Pickup & Delivery</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Transfer Type */}
-            <div>
-              <Label>Transfer Type *</Label>
-              <RadioGroup
-                value={formData.transferType}
-                onValueChange={(value) => handleInputChange("transferType", value)}
-                className="flex gap-4 mt-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="self-transfer" id="self-transfer" />
-                  <Label htmlFor="self-transfer">Self Transfer Only</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="shipping" id="shipping" />
-                  <Label htmlFor="shipping">Shipping Only</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="both" id="both" />
-                  <Label htmlFor="both">Both</Label>
-                </div>
-              </RadioGroup>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="location_address">Location Address</Label>
+                <Input
+                  id="location_address"
+                  value={formData.location_address}
+                  onChange={(e) => setFormData({ ...formData, location_address: e.target.value })}
+                  placeholder="City, Area, State"
+                />
+              </div>
+              <div>
+                <Label htmlFor="postal_code">Postal Code</Label>
+                <Input
+                  id="postal_code"
+                  value={formData.postal_code}
+                  onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
+                  placeholder="123456"
+                />
+              </div>
             </div>
 
-            {/* Description */}
+            <div className="flex items-center space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={getCurrentLocation}
+                disabled={gettingLocation}
+                className="flex items-center space-x-2"
+              >
+                <MapPin className="h-4 w-4" />
+                <span>{gettingLocation ? "Getting Location..." : "Get Current Location"}</span>
+              </Button>
+              {formData.latitude && formData.longitude && (
+                <span className="text-sm text-green-600">
+                  ✓ Location saved
+                </span>
+              )}
+            </div>
+
             <div>
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                placeholder="Describe the book's condition, any notes, etc."
                 value={formData.description}
-                onChange={(e) => handleInputChange("description", e.target.value)}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Additional details about the book..."
                 rows={3}
               />
             </div>
 
-            {/* Location */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="locationAddress">Location Address</Label>
-                <Input
-                  id="locationAddress"
-                  placeholder="City, Area"
-                  value={formData.locationAddress}
-                  onChange={(e) => handleInputChange("locationAddress", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="postalCode">Postal Code</Label>
-                <Input
-                  id="postalCode"
-                  placeholder="123456"
-                  value={formData.postalCode}
-                  onChange={(e) => handleInputChange("postalCode", e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Images */}
             <div>
-              <Label>Book Images (Max 3)</Label>
-              <div className="mt-2">
-                {images.length < 3 && (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      id="image-upload"
-                    />
-                    <label htmlFor="image-upload" className="cursor-pointer">
-                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">Click to upload images</p>
-                    </label>
-                  </div>
-                )}
-
-                {images.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 mt-4">
-                    {images.map((image, index) => (
-                      <div key={index} className="relative">
-                        <img
-                          src={image}
-                          alt={`Book ${index + 1}`}
-                          className="w-full h-24 object-cover rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <Label htmlFor="images">Book Images (Max 5)</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="images"
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                <Upload className="h-4 w-4 text-gray-400" />
               </div>
+              {images.length > 0 && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {images.length} image(s) selected
+                </p>
+              )}
             </div>
 
-            {/* Security Deposit Notice */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Security Deposit:</strong> ₹100 (refundable when book is sold)
-              </p>
-              <p className="text-sm text-blue-600 mt-1">
-                When your book sells, you'll receive: Book Price + ₹100 Security Deposit - ₹20 Platform Fee
-              </p>
-              <p className="text-sm text-blue-600 font-semibold mt-2">
-                Example: Book sells for ₹250 → You get ₹330 (₹250 + ₹100 - ₹20)
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <p className="text-sm text-orange-800 font-semibold">Security Deposit Required</p>
+              <p className="text-sm text-orange-600">
+                After listing, you'll need to pay ₹100 security deposit to activate your listing.
+                When your book sells, you'll receive the book price + ₹100 - ₹20 platform fee.
               </p>
             </div>
 
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Creating Listing..." : "List Book & Pay Security Deposit"}
+              {loading ? "Listing Book..." : "List Book"}
             </Button>
           </form>
         </CardContent>
