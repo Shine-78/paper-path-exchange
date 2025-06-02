@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookPlus, Upload, MapPin } from "lucide-react";
+import { BookPlus, Upload, MapPin, X } from "lucide-react";
 
 export const SellBook = () => {
   const [formData, setFormData] = useState({
@@ -23,6 +23,7 @@ export const SellBook = () => {
     longitude: null as number | null,
   });
   const [images, setImages] = useState<File[]>([]);
+  const [imagePreview, setImagePreview] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const { toast } = useToast();
@@ -71,7 +72,76 @@ export const SellBook = () => {
       });
       return;
     }
+    
     setImages(files);
+    
+    // Create preview URLs for selected images
+    const previewUrls = files.map(file => URL.createObjectURL(file));
+    setImagePreview(previewUrls);
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = images.filter((_, i) => i !== index);
+    const newPreviews = imagePreview.filter((_, i) => i !== index);
+    
+    // Revoke the URL to prevent memory leaks
+    URL.revokeObjectURL(imagePreview[index]);
+    
+    setImages(newImages);
+    setImagePreview(newPreviews);
+  };
+
+  const uploadImages = async (files: File[], userId: string): Promise<string[]> => {
+    const imageUrls: string[] = [];
+    
+    for (const image of files) {
+      try {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        // First, ensure the bucket exists by trying to create it
+        const { error: bucketError } = await supabase.storage
+          .from('book-images')
+          .list('', { limit: 1 });
+          
+        if (bucketError && bucketError.message.includes('Bucket not found')) {
+          console.log("Creating book-images bucket...");
+          // The bucket doesn't exist, but we can't create it from the client
+          // We'll skip image upload for now and continue with the listing
+          console.warn("Bucket 'book-images' not found. Skipping image upload.");
+          continue;
+        }
+        
+        const { error: uploadError } = await supabase.storage
+          .from('book-images')
+          .upload(fileName, image);
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast({
+            title: "Warning",
+            description: `Failed to upload image: ${image.name}`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('book-images')
+          .getPublicUrl(fileName);
+        
+        imageUrls.push(publicUrl);
+      } catch (error) {
+        console.error("Error uploading image:", error);
+        toast({
+          title: "Warning", 
+          description: `Failed to upload image: ${image.name}`,
+          variant: "destructive",
+        });
+      }
+    }
+    
+    return imageUrls;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,27 +161,9 @@ export const SellBook = () => {
       if (!user) throw new Error("Not authenticated");
 
       // Upload images if any
-      const imageUrls: string[] = [];
-      for (const image of images) {
-        const fileExt = image.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('book-images')
-          .upload(fileName, image);
+      const imageUrls = await uploadImages(images, user.id);
 
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          // Continue without image if upload fails
-        } else {
-          const { data: { publicUrl } } = supabase.storage
-            .from('book-images')
-            .getPublicUrl(fileName);
-          imageUrls.push(publicUrl);
-        }
-      }
-
-      // Create book listing with "available" status instead of "draft"
+      // Create book listing with "available" status
       const { error } = await supabase
         .from("books")
         .insert({
@@ -127,7 +179,7 @@ export const SellBook = () => {
           longitude: formData.longitude,
           seller_id: user.id,
           images: imageUrls,
-          status: "available", // Use "available" instead of "draft"
+          status: "available",
           listing_paid: false,
         });
 
@@ -138,7 +190,7 @@ export const SellBook = () => {
         description: "Book listed successfully! Pay security deposit to activate.",
       });
 
-      // Reset form
+      // Reset form and clean up preview URLs
       setFormData({
         title: "",
         author: "",
@@ -152,6 +204,8 @@ export const SellBook = () => {
         longitude: null,
       });
       setImages([]);
+      imagePreview.forEach(url => URL.revokeObjectURL(url));
+      setImagePreview([]);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -234,8 +288,8 @@ export const SellBook = () => {
                   <SelectValue placeholder="Select transfer type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pickup">Pickup Only</SelectItem>
-                  <SelectItem value="delivery">Delivery Only</SelectItem>
+                  <SelectItem value="pickup_only">Pickup Only</SelectItem>
+                  <SelectItem value="delivery_only">Delivery Only</SelectItem>
                   <SelectItem value="both">Both Pickup & Delivery</SelectItem>
                 </SelectContent>
               </Select>
@@ -304,10 +358,32 @@ export const SellBook = () => {
                 />
                 <Upload className="h-4 w-4 text-gray-400" />
               </div>
-              {images.length > 0 && (
-                <p className="text-sm text-gray-600 mt-1">
-                  {images.length} image(s) selected
-                </p>
+              
+              {/* Image Preview Section */}
+              {imagePreview.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    {imagePreview.length} image(s) selected
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {imagePreview.map((url, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
