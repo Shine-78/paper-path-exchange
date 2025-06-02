@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -235,8 +234,8 @@ export const SellBook = () => {
                   <SelectValue placeholder="Select transfer type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pickup-only">Pickup Only</SelectItem>
-                  <SelectItem value="delivery-only">Delivery Only</SelectItem>
+                  <SelectItem value="pickup">Pickup Only</SelectItem>
+                  <SelectItem value="delivery">Delivery Only</SelectItem>
                   <SelectItem value="both">Both Pickup & Delivery</SelectItem>
                 </SelectContent>
               </Select>
