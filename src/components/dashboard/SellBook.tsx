@@ -112,7 +112,7 @@ export const SellBook = () => {
         }
       }
 
-      // Create book listing
+      // Create book listing with "available" status instead of "draft"
       const { error } = await supabase
         .from("books")
         .insert({
@@ -128,7 +128,7 @@ export const SellBook = () => {
           longitude: formData.longitude,
           seller_id: user.id,
           images: imageUrls,
-          status: "draft", // Book starts as draft until security deposit is paid
+          status: "available", // Use "available" instead of "draft"
           listing_paid: false,
         });
 
