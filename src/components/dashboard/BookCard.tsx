@@ -127,7 +127,6 @@ export const BookCard = ({ book }: BookCardProps) => {
           isOpen={isRequestModalOpen}
           onClose={() => setIsRequestModalOpen(false)}
           book={book}
-          sellerId={book.seller_id}
         />
       )}
     </>
