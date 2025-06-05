@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -64,10 +65,10 @@ export const SellBook = () => {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length > 5) {
+    if (files.length > 3) {
       toast({
         title: "Error",
-        description: "Maximum 5 images allowed",
+        description: "Maximum 3 images allowed",
         variant: "destructive",
       });
       return;
@@ -77,6 +78,9 @@ export const SellBook = () => {
     
     // Create preview URLs for selected images
     const previewUrls = files.map(file => URL.createObjectURL(file));
+    
+    // Clean up old preview URLs
+    imagePreview.forEach(url => URL.revokeObjectURL(url));
     setImagePreview(previewUrls);
   };
 
@@ -99,18 +103,7 @@ export const SellBook = () => {
         const fileExt = image.name.split('.').pop();
         const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         
-        // First, ensure the bucket exists by trying to create it
-        const { error: bucketError } = await supabase.storage
-          .from('book-images')
-          .list('', { limit: 1 });
-          
-        if (bucketError && bucketError.message.includes('Bucket not found')) {
-          console.log("Creating book-images bucket...");
-          // The bucket doesn't exist, but we can't create it from the client
-          // We'll skip image upload for now and continue with the listing
-          console.warn("Bucket 'book-images' not found. Skipping image upload.");
-          continue;
-        }
+        console.log("Uploading image:", fileName);
         
         const { error: uploadError } = await supabase.storage
           .from('book-images')
@@ -120,7 +113,7 @@ export const SellBook = () => {
           console.error("Upload error:", uploadError);
           toast({
             title: "Warning",
-            description: `Failed to upload image: ${image.name}`,
+            description: `Failed to upload image: ${image.name}. Error: ${uploadError.message}`,
             variant: "destructive",
           });
           continue;
@@ -130,6 +123,7 @@ export const SellBook = () => {
           .from('book-images')
           .getPublicUrl(fileName);
         
+        console.log("Image uploaded successfully:", publicUrl);
         imageUrls.push(publicUrl);
       } catch (error) {
         console.error("Error uploading image:", error);
@@ -162,6 +156,23 @@ export const SellBook = () => {
 
       // Upload images if any
       const imageUrls = await uploadImages(images, user.id);
+
+      console.log("Creating book listing with data:", {
+        title: formData.title,
+        author: formData.author,
+        condition: formData.condition,
+        price_range: parseInt(formData.price_range),
+        transfer_type: formData.transfer_type,
+        description: formData.description,
+        location_address: formData.location_address,
+        postal_code: formData.postal_code,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        seller_id: user.id,
+        images: imageUrls,
+        status: "available",
+        listing_paid: false,
+      });
 
       // Create book listing with "available" status
       const { error } = await supabase
@@ -207,6 +218,7 @@ export const SellBook = () => {
       imagePreview.forEach(url => URL.revokeObjectURL(url));
       setImagePreview([]);
     } catch (error: any) {
+      console.error("Error creating book listing:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -268,16 +280,15 @@ export const SellBook = () => {
               </div>
               <div>
                 <Label htmlFor="price_range">Price (₹) *</Label>
-                <Select value={formData.price_range} onValueChange={(value) => setFormData({ ...formData, price_range: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select price range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="20">₹20</SelectItem>
-                    <SelectItem value="35">₹35</SelectItem>
-                    <SelectItem value="50">₹50</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="price_range"
+                  type="number"
+                  value={formData.price_range}
+                  onChange={(e) => setFormData({ ...formData, price_range: e.target.value })}
+                  placeholder="Enter price"
+                  min="1"
+                  required
+                />
               </div>
             </div>
 
@@ -288,8 +299,8 @@ export const SellBook = () => {
                   <SelectValue placeholder="Select transfer type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pickup_only">Pickup Only</SelectItem>
-                  <SelectItem value="delivery_only">Delivery Only</SelectItem>
+                  <SelectItem value="pickup">Pickup Only</SelectItem>
+                  <SelectItem value="delivery">Delivery Only</SelectItem>
                   <SelectItem value="both">Both Pickup & Delivery</SelectItem>
                 </SelectContent>
               </Select>
@@ -346,7 +357,7 @@ export const SellBook = () => {
             </div>
 
             <div>
-              <Label htmlFor="images">Book Images (Max 5)</Label>
+              <Label htmlFor="images">Book Images (Max 3)</Label>
               <div className="flex items-center space-x-2">
                 <Input
                   id="images"
