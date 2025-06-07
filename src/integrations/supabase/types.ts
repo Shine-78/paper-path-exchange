@@ -119,6 +119,85 @@ export type Database = {
           },
         ]
       }
+      delivery_confirmations: {
+        Row: {
+          buyer_confirmed_delivery: boolean | null
+          buyer_confirmed_payment: boolean | null
+          buyer_id: string | null
+          created_at: string | null
+          final_payout_processed: boolean | null
+          id: string
+          otp_code: string
+          otp_sent_at: string | null
+          otp_verified_at: string | null
+          payment_method: string | null
+          purchase_request_id: string | null
+          seller_confirmed_delivery: boolean | null
+          seller_confirmed_payment: boolean | null
+          seller_id: string | null
+          stripe_payment_intent_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          buyer_confirmed_delivery?: boolean | null
+          buyer_confirmed_payment?: boolean | null
+          buyer_id?: string | null
+          created_at?: string | null
+          final_payout_processed?: boolean | null
+          id?: string
+          otp_code: string
+          otp_sent_at?: string | null
+          otp_verified_at?: string | null
+          payment_method?: string | null
+          purchase_request_id?: string | null
+          seller_confirmed_delivery?: boolean | null
+          seller_confirmed_payment?: boolean | null
+          seller_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          buyer_confirmed_delivery?: boolean | null
+          buyer_confirmed_payment?: boolean | null
+          buyer_id?: string | null
+          created_at?: string | null
+          final_payout_processed?: boolean | null
+          id?: string
+          otp_code?: string
+          otp_sent_at?: string | null
+          otp_verified_at?: string | null
+          payment_method?: string | null
+          purchase_request_id?: string | null
+          seller_confirmed_delivery?: boolean | null
+          seller_confirmed_payment?: boolean | null
+          seller_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_confirmations_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_confirmations_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_confirmations_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null

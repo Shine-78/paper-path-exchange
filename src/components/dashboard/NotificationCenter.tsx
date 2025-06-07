@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -6,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bell, Check, X, Trash2 } from "lucide-react";
+import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 interface Notification {
   id: string;
@@ -23,6 +23,7 @@ export const NotificationCenter = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { playNotificationSound } = useNotificationSound();
 
   const fetchNotifications = async () => {
     try {
@@ -72,7 +73,8 @@ export const NotificationCenter = () => {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications'
-      }, () => {
+      }, (payload) => {
+        playNotificationSound();
         fetchNotifications();
       })
       .subscribe();

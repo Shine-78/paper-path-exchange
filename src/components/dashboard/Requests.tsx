@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Check, X, Clock } from "lucide-react";
+import { MessageSquare, Check, X, Clock, Package } from "lucide-react";
 import { ChatModal } from "./ChatModal";
 import { ReviewModal } from "./ReviewModal";
+import { DeliveryConfirmationModal } from "./DeliveryConfirmationModal";
+import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 interface PurchaseRequest {
   id: string;
@@ -42,7 +44,14 @@ export const Requests = () => {
     bookTitle: string;
     reviewType: 'buyer_to_seller' | 'seller_to_buyer';
   } | null>(null);
+  const [selectedDeliveryRequest, setSelectedDeliveryRequest] = useState<{
+    requestId: string;
+    userType: 'buyer' | 'seller';
+    bookTitle: string;
+    bookPrice: number;
+  } | null>(null);
   const { toast } = useToast();
+  const { playNotificationSound } = useNotificationSound();
 
   const fetchRequests = async () => {
     try {
@@ -92,6 +101,30 @@ export const Requests = () => {
 
   useEffect(() => {
     fetchRequests();
+
+    // Set up real-time subscription for notifications
+    const channel = supabase
+      .channel('requests_updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'purchase_requests'
+      }, (payload) => {
+        playNotificationSound();
+        fetchRequests();
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications'
+      }, (payload) => {
+        playNotificationSound();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const updateRequestStatus = async (requestId: string, status: string) => {
@@ -113,6 +146,8 @@ export const Requests = () => {
         title: "Success",
         description: `Request ${status}`,
       });
+
+      playNotificationSound();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -200,10 +235,23 @@ export const Requests = () => {
         )}
 
         {request.status === "accepted" && (
-          <div className="bg-green-50 p-3 rounded-lg">
+          <div className="bg-green-50 p-3 rounded-lg space-y-2">
             <p className="text-sm text-green-800">
-              Request accepted! Use chat to arrange pickup/delivery.
+              Request accepted! Arrange delivery and use the delivery confirmation system.
             </p>
+            <Button 
+              size="sm" 
+              className="w-full"
+              onClick={() => setSelectedDeliveryRequest({
+                requestId: request.id,
+                userType: type === "sent" ? "buyer" : "seller",
+                bookTitle: request.books.title,
+                bookPrice: request.offered_price
+              })}
+            >
+              <Package className="h-4 w-4 mr-1" />
+              Delivery Confirmation
+            </Button>
           </div>
         )}
 
@@ -327,6 +375,17 @@ export const Requests = () => {
           reviewedUserName={selectedReviewRequest.reviewedUserName}
           bookTitle={selectedReviewRequest.bookTitle}
           reviewType={selectedReviewRequest.reviewType}
+        />
+      )}
+
+      {selectedDeliveryRequest && (
+        <DeliveryConfirmationModal
+          isOpen={!!selectedDeliveryRequest}
+          onClose={() => setSelectedDeliveryRequest(null)}
+          purchaseRequestId={selectedDeliveryRequest.requestId}
+          userType={selectedDeliveryRequest.userType}
+          bookTitle={selectedDeliveryRequest.bookTitle}
+          bookPrice={selectedDeliveryRequest.bookPrice}
         />
       )}
     </div>
