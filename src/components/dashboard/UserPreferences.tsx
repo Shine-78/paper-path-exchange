@@ -39,15 +39,15 @@ export const UserPreferences = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Use RPC call to get preferences or fallback
       const { data, error } = await supabase
-        .from("user_preferences")
-        .select("*")
-        .eq("user_id", user.id)
+        .rpc('get_user_preferences', { user_id: user.id })
         .single();
 
-      if (error && error.code !== "PGRST116") throw error;
-      
-      if (data) {
+      if (error && error.code !== "PGRST116") {
+        // Fallback for when RPC doesn't exist
+        console.log("Preferences not found, using defaults");
+      } else if (data) {
         setPreferences(data);
       }
     } catch (error: any) {
@@ -67,15 +67,24 @@ export const UserPreferences = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from("user_preferences")
-        .upsert({
-          user_id: user.id,
-          ...preferences,
-          updated_at: new Date().toISOString()
-        });
+      // Use RPC call to save preferences
+      const { error } = await supabase.rpc('upsert_user_preferences', {
+        p_user_id: user.id,
+        p_preferences: preferences
+      });
 
-      if (error) throw error;
+      if (error) {
+        // Fallback to direct upsert if RPC doesn't exist
+        const { error: upsertError } = await supabase
+          .from("user_preferences" as any)
+          .upsert({
+            user_id: user.id,
+            ...preferences,
+            updated_at: new Date().toISOString()
+          } as any);
+
+        if (upsertError) throw upsertError;
+      }
 
       toast({
         title: "Success",

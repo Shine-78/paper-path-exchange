@@ -36,7 +36,21 @@ export const NotificationCenter = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setNotifications(data || []);
+      
+      // Map data to ensure all properties are present
+      const mappedNotifications: Notification[] = (data || []).map(notification => ({
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        read: notification.read || false,
+        priority: notification.priority || 'normal',
+        action_url: notification.action_url,
+        created_at: notification.created_at || '',
+        related_id: notification.related_id
+      }));
+      
+      setNotifications(mappedNotifications);
     } catch (error: any) {
       toast({
         title: "Error",

@@ -7,12 +7,15 @@ import { SellBook } from "./SellBook";
 import { MyBooks } from "./MyBooks";
 import { Profile } from "./Profile";
 import { Requests } from "./Requests";
+import { NotificationCenter } from "./NotificationCenter";
+import { AdminDashboard } from "./AdminDashboard";
+import { UserPreferences } from "./UserPreferences";
 
 interface DashboardProps {
   user: User | null;
 }
 
-export type DashboardView = "discover" | "sell" | "my-books" | "requests" | "profile";
+export type DashboardView = "discover" | "sell" | "my-books" | "requests" | "profile" | "notifications" | "admin" | "preferences";
 
 export const Dashboard = ({ user }: DashboardProps) => {
   const [currentView, setCurrentView] = useState<DashboardView>("discover");
@@ -29,6 +32,12 @@ export const Dashboard = ({ user }: DashboardProps) => {
         return <Requests />;
       case "profile":
         return <Profile user={user} />;
+      case "notifications":
+        return <NotificationCenter />;
+      case "admin":
+        return <AdminDashboard />;
+      case "preferences":
+        return <UserPreferences />;
       default:
         return <BookDiscovery />;
     }
