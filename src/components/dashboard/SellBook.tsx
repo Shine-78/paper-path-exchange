@@ -401,8 +401,8 @@ export const SellBook = () => {
             <div className="bg-orange-50 p-4 rounded-lg">
               <p className="text-sm text-orange-800 font-semibold">Security Deposit Required</p>
               <p className="text-sm text-orange-600">
-                After listing, you'll need to pay ₹100 security deposit to activate your listing.
-                When your book sells, you'll receive the book price + ₹100 - ₹20 platform fee.
+                After listing, you'll need to pay ₹50 security deposit to activate your listing.
+                When your book sells, you'll receive the book price + ₹30 refund. Platform fee: ₹20.
               </p>
             </div>
 

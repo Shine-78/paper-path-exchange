@@ -42,11 +42,12 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     });
 
-    // Calculate amounts
+    // Calculate amounts with new payment structure
     const bookPrice = request.offered_price; // in rupees
-    const securityDeposit = 10000; // ₹100 in paisa
+    const securityDeposit = 5000; // ₹50 in paisa (updated)
     const platformFee = 2000; // ₹20 in paisa
-    const totalRefund = bookPrice * 100 + securityDeposit - platformFee; // convert to paisa
+    const sellerRefund = 3000; // ₹30 in paisa (new structure)
+    const totalSellerPayout = bookPrice * 100 + sellerRefund; // book price + ₹30 refund
 
     // Find seller's customer ID
     const customers = await stripe.customers.list({ 
@@ -58,10 +59,6 @@ serve(async (req) => {
       throw new Error('Seller not found in Stripe');
     }
 
-    // Create refund/transfer to seller
-    // In a real implementation, you'd use Stripe Connect for marketplace payments
-    // For now, we'll simulate by creating a payment intent for the seller
-    
     // Update book status to sold
     await supabaseService
       .from('books')
@@ -74,20 +71,34 @@ serve(async (req) => {
       .update({ status: 'completed' })
       .eq('id', purchaseRequestId);
 
-    // Create notification for seller
+    // Create notification for seller with updated amounts
     await supabaseService
       .from('notifications')
       .insert({
         user_id: request.seller_id,
         type: 'book_sold',
         title: 'Book Sold Successfully!',
-        message: `Your book "${request.books.title}" has been sold for ₹${bookPrice}. You'll receive ₹${totalRefund/100} (book price + security deposit - platform fee).`,
-        related_id: request.book_id
+        message: `Your book "${request.books.title}" has been sold for ₹${bookPrice}. You'll receive ₹${totalSellerPayout/100} (book price ₹${bookPrice} + security refund ₹30). Platform fee: ₹20.`,
+        related_id: request.book_id,
+        priority: 'high'
+      });
+
+    // Create notification for buyer
+    await supabaseService
+      .from('notifications')
+      .insert({
+        user_id: request.buyer_id,
+        type: 'purchase_confirmed',
+        title: 'Purchase Confirmed!',
+        message: `Your purchase of "${request.books.title}" for ₹${bookPrice} has been confirmed. Contact the seller to arrange pickup/delivery.`,
+        related_id: request.book_id,
+        priority: 'high'
       });
 
     return new Response(JSON.stringify({ 
       success: true,
-      totalRefund: totalRefund/100,
+      sellerPayout: totalSellerPayout/100,
+      platformFee: platformFee/100,
       message: 'Book sale processed successfully'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

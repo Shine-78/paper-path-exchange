@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -221,10 +220,10 @@ export const MyBooks = () => {
                 {!book.listing_paid && (
                   <div className="bg-orange-50 p-3 rounded-lg">
                     <p className="text-sm text-orange-800 mb-2">
-                      Pay ₹100 security deposit to activate this listing
+                      Pay ₹50 security deposit to activate this listing
                     </p>
                     <p className="text-xs text-orange-600 mb-3">
-                      You'll get ₹100 + book price - ₹20 platform fee when sold
+                      You'll get ₹30 refund + book price when sold. Platform fee: ₹20
                     </p>
                     <Button 
                       size="sm" 

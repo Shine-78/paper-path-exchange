@@ -38,7 +38,7 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    // Create payment session for ₹100 security deposit
+    // Create payment session for ₹50 security deposit (updated amount)
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
@@ -48,9 +48,9 @@ serve(async (req) => {
             currency: 'inr',
             product_data: { 
               name: 'Book Listing Security Deposit',
-              description: 'Refundable security deposit for listing your book'
+              description: 'Security deposit for listing your book - refundable when sold'
             },
-            unit_amount: 10000, // ₹100 in paisa
+            unit_amount: 5000, // ₹50 in paisa (updated from ₹100)
           },
           quantity: 1,
         },

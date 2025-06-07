@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Check, X, Clock } from "lucide-react";
 import { ChatModal } from "./ChatModal";
+import { ReviewModal } from "./ReviewModal";
 
 interface PurchaseRequest {
   id: string;
@@ -35,6 +35,13 @@ export const Requests = () => {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedChatRequest, setSelectedChatRequest] = useState<string | null>(null);
+  const [selectedReviewRequest, setSelectedReviewRequest] = useState<{
+    requestId: string;
+    reviewedUserId: string;
+    reviewedUserName: string;
+    bookTitle: string;
+    reviewType: 'buyer_to_seller' | 'seller_to_buyer';
+  } | null>(null);
   const { toast } = useToast();
 
   const fetchRequests = async () => {
@@ -200,6 +207,27 @@ export const Requests = () => {
           </div>
         )}
 
+        {request.status === "completed" && (
+          <div className="bg-green-50 p-3 rounded-lg">
+            <p className="text-sm text-green-800 mb-2">
+              Transaction completed successfully!
+            </p>
+            <Button 
+              size="sm" 
+              className="w-full"
+              onClick={() => setSelectedReviewRequest({
+                requestId: request.id,
+                reviewedUserId: type === "sent" ? request.seller_profiles?.full_name || "Unknown" : request.buyer_profiles?.full_name || "Unknown",
+                reviewedUserName: type === "sent" ? request.seller_profiles?.full_name || "Seller" : request.buyer_profiles?.full_name || "Buyer",
+                bookTitle: request.books.title,
+                reviewType: type === "sent" ? "buyer_to_seller" : "seller_to_buyer"
+              })}
+            >
+              Leave Review
+            </Button>
+          </div>
+        )}
+
         <div className="flex justify-between text-xs text-gray-500">
           <span>{new Date(request.created_at).toLocaleDateString()}</span>
           <Button 
@@ -287,6 +315,18 @@ export const Requests = () => {
           onClose={() => setSelectedChatRequest(null)}
           requestId={selectedChatRequest}
           currentUserId={currentUserId}
+        />
+      )}
+
+      {selectedReviewRequest && (
+        <ReviewModal
+          isOpen={!!selectedReviewRequest}
+          onClose={() => setSelectedReviewRequest(null)}
+          purchaseRequestId={selectedReviewRequest.requestId}
+          reviewedUserId={selectedReviewRequest.reviewedUserId}
+          reviewedUserName={selectedReviewRequest.reviewedUserName}
+          bookTitle={selectedReviewRequest.bookTitle}
+          reviewType={selectedReviewRequest.reviewType}
         />
       )}
     </div>
