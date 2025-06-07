@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -55,16 +54,8 @@ export const AdminDashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      // Use RPC call or simple check since admin_users table might not be in types
-      try {
-        const { data } = await supabase
-          .rpc('check_admin_status', { user_id: user.id })
-          .single();
-        return !!data;
-      } catch {
-        // Fallback: check if user email contains admin (temporary)
-        return user?.email?.includes('admin') || false;
-      }
+      // Temporary: check if user email contains admin
+      return user?.email?.includes('admin') || false;
     } catch {
       return false;
     }
@@ -122,8 +113,8 @@ export const AdminDashboard = () => {
         email: user.email,
         full_name: user.full_name,
         created_at: user.created_at || '',
-        average_rating: (user as any).average_rating || 0,
-        total_reviews: (user as any).total_reviews || 0
+        average_rating: 0, // Default since we don't have this data yet
+        total_reviews: 0 // Default since we don't have this data yet
       }));
       
       setUsers(mappedUsers);

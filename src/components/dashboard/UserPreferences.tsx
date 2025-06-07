@@ -39,19 +39,26 @@ export const UserPreferences = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Use RPC call to get preferences or fallback
+      // Since user_preferences table doesn't exist in types yet, use edge function
       try {
-        const { data, error } = await supabase
-          .rpc('get_user_preferences', { user_id: user.id })
-          .single();
+        const response = await fetch('/api/get-preferences', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: user.id
+          }),
+        });
 
-        if (error && error.code !== "PGRST116") {
-          throw error;
-        } else if (data) {
-          setPreferences(data);
+        if (response.ok) {
+          const data = await response.json();
+          if (data) {
+            setPreferences(data);
+          }
         }
       } catch (error) {
-        // Fallback: use defaults if preferences don't exist or RPC fails
+        // Use defaults if preferences don't exist
         console.log("Preferences not found, using defaults");
       }
     } catch (error: any) {
@@ -71,30 +78,20 @@ export const UserPreferences = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Use RPC call to save preferences
-      try {
-        const { error } = await supabase.rpc('upsert_user_preferences', {
-          p_user_id: user.id,
-          p_preferences: preferences
-        });
+      // Use edge function to handle preferences update
+      const response = await fetch('/api/update-preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          preferences: preferences
+        }),
+      });
 
-        if (error) throw error;
-      } catch (rpcError) {
-        // Fallback: Use edge function to handle preferences update
-        const response = await fetch('/api/update-preferences', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            preferences: preferences
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to save preferences');
-        }
+      if (!response.ok) {
+        throw new Error('Failed to save preferences');
       }
 
       toast({

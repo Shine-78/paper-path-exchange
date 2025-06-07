@@ -53,40 +53,25 @@ export const ReviewModal = ({
         .eq('id', purchaseRequestId)
         .single();
 
-      // Use RPC to insert review (to bypass TypeScript issues)
-      try {
-        const { error } = await supabase.rpc('insert_review', {
-          p_reviewer_id: user.id,
-          p_reviewed_user_id: reviewedUserId,
-          p_book_id: request?.book_id,
-          p_purchase_request_id: purchaseRequestId,
-          p_rating: rating,
-          p_review_text: reviewText.trim() || null,
-          p_review_type: reviewType
-        });
+      // Use edge function to handle review insertion since we don't have the reviews table in types
+      const response = await fetch('/api/submit-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reviewer_id: user.id,
+          reviewed_user_id: reviewedUserId,
+          book_id: request?.book_id,
+          purchase_request_id: purchaseRequestId,
+          rating,
+          review_text: reviewText.trim() || null,
+          review_type: reviewType
+        }),
+      });
 
-        if (error) throw error;
-      } catch (rpcError) {
-        // Fallback: Use edge function to handle review insertion
-        const response = await fetch('/api/submit-review', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            reviewer_id: user.id,
-            reviewed_user_id: reviewedUserId,
-            book_id: request?.book_id,
-            purchase_request_id: purchaseRequestId,
-            rating,
-            review_text: reviewText.trim() || null,
-            review_type: reviewType
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to submit review');
-        }
+      if (!response.ok) {
+        throw new Error('Failed to submit review');
       }
 
       toast({
