@@ -56,15 +56,17 @@ export const AdminDashboard = () => {
       if (!user) return false;
 
       // Use RPC call or simple check since admin_users table might not be in types
-      const { data } = await supabase
-        .rpc('check_admin_status', { user_id: user.id })
-        .single();
-
-      return !!data;
+      try {
+        const { data } = await supabase
+          .rpc('check_admin_status', { user_id: user.id })
+          .single();
+        return !!data;
+      } catch {
+        // Fallback: check if user email contains admin (temporary)
+        return user?.email?.includes('admin') || false;
+      }
     } catch {
-      // Fallback: check if user email contains admin (temporary)
-      const { data: { user } } = await supabase.auth.getUser();
-      return user?.email?.includes('admin') || false;
+      return false;
     }
   };
 
@@ -120,8 +122,8 @@ export const AdminDashboard = () => {
         email: user.email,
         full_name: user.full_name,
         created_at: user.created_at || '',
-        average_rating: user.average_rating || 0,
-        total_reviews: user.total_reviews || 0
+        average_rating: (user as any).average_rating || 0,
+        total_reviews: (user as any).total_reviews || 0
       }));
       
       setUsers(mappedUsers);

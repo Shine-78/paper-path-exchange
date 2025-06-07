@@ -37,15 +37,15 @@ export const NotificationCenter = () => {
 
       if (error) throw error;
       
-      // Map data to ensure all properties are present
+      // Map data to ensure all properties are present with defaults
       const mappedNotifications: Notification[] = (data || []).map(notification => ({
         id: notification.id,
         type: notification.type,
         title: notification.title,
         message: notification.message,
         read: notification.read || false,
-        priority: notification.priority || 'normal',
-        action_url: notification.action_url,
+        priority: (notification as any).priority || 'normal',
+        action_url: (notification as any).action_url,
         created_at: notification.created_at || '',
         related_id: notification.related_id
       }));

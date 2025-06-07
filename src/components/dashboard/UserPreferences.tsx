@@ -40,15 +40,19 @@ export const UserPreferences = () => {
       if (!user) return;
 
       // Use RPC call to get preferences or fallback
-      const { data, error } = await supabase
-        .rpc('get_user_preferences', { user_id: user.id })
-        .single();
+      try {
+        const { data, error } = await supabase
+          .rpc('get_user_preferences', { user_id: user.id })
+          .single();
 
-      if (error && error.code !== "PGRST116") {
-        // Fallback for when RPC doesn't exist
+        if (error && error.code !== "PGRST116") {
+          throw error;
+        } else if (data) {
+          setPreferences(data);
+        }
+      } catch (error) {
+        // Fallback: use defaults if preferences don't exist or RPC fails
         console.log("Preferences not found, using defaults");
-      } else if (data) {
-        setPreferences(data);
       }
     } catch (error: any) {
       console.error("Error fetching preferences:", error);
@@ -68,22 +72,29 @@ export const UserPreferences = () => {
       if (!user) throw new Error("Not authenticated");
 
       // Use RPC call to save preferences
-      const { error } = await supabase.rpc('upsert_user_preferences', {
-        p_user_id: user.id,
-        p_preferences: preferences
-      });
+      try {
+        const { error } = await supabase.rpc('upsert_user_preferences', {
+          p_user_id: user.id,
+          p_preferences: preferences
+        });
 
-      if (error) {
-        // Fallback to direct upsert if RPC doesn't exist
-        const { error: upsertError } = await supabase
-          .from("user_preferences" as any)
-          .upsert({
+        if (error) throw error;
+      } catch (rpcError) {
+        // Fallback: Use edge function to handle preferences update
+        const response = await fetch('/api/update-preferences', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             user_id: user.id,
-            ...preferences,
-            updated_at: new Date().toISOString()
-          } as any);
+            preferences: preferences
+          }),
+        });
 
-        if (upsertError) throw upsertError;
+        if (!response.ok) {
+          throw new Error('Failed to save preferences');
+        }
       }
 
       toast({
