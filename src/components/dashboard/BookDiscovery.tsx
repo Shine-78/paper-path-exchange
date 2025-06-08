@@ -23,6 +23,8 @@ interface Book {
   profiles?: {
     full_name: string;
     location_address: string;
+    average_rating: number;
+    review_count: number;
   };
 }
 
@@ -42,7 +44,9 @@ export const BookDiscovery = () => {
           *,
           profiles:seller_id (
             full_name,
-            location_address
+            location_address,
+            average_rating,
+            review_count
           )
         `)
         .eq("status", "available");

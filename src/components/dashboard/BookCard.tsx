@@ -1,9 +1,11 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, User } from "lucide-react";
 import { PurchaseRequestModal } from "./PurchaseRequestModal";
+import { UserRating } from "./UserRating";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Book {
@@ -27,7 +29,7 @@ interface Book {
 
 interface BookCardProps {
   book: Book;
-  onRequestPurchase: (book: Book) => void;
+  onRequestPurchase?: (book: Book) => void;
 }
 
 export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
@@ -139,7 +141,7 @@ export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
         </CardContent>
       </Card>
 
-      {canRequestBook && (
+      {canRequestBook && onRequestPurchase && (
         <PurchaseRequestModal
           isOpen={isRequestModalOpen}
           onClose={() => setIsRequestModalOpen(false)}

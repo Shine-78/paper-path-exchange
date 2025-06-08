@@ -241,6 +241,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          average_rating: number | null
           created_at: string | null
           email: string
           full_name: string | null
@@ -252,9 +253,11 @@ export type Database = {
           postal_code: string | null
           registration_paid: boolean | null
           registration_payment_id: string | null
+          review_count: number | null
           updated_at: string | null
         }
         Insert: {
+          average_rating?: number | null
           created_at?: string | null
           email: string
           full_name?: string | null
@@ -266,9 +269,11 @@ export type Database = {
           postal_code?: string | null
           registration_paid?: boolean | null
           registration_payment_id?: string | null
+          review_count?: number | null
           updated_at?: string | null
         }
         Update: {
+          average_rating?: number | null
           created_at?: string | null
           email?: string
           full_name?: string | null
@@ -280,6 +285,7 @@ export type Database = {
           postal_code?: string | null
           registration_paid?: boolean | null
           registration_payment_id?: string | null
+          review_count?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -339,6 +345,74 @@ export type Database = {
           {
             foreignKeyName: "purchase_requests_seller_id_fkey"
             columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          book_id: string | null
+          created_at: string | null
+          id: string
+          purchase_request_id: string | null
+          rating: number
+          review_text: string | null
+          review_type: string
+          reviewed_user_id: string | null
+          reviewer_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          book_id?: string | null
+          created_at?: string | null
+          id?: string
+          purchase_request_id?: string | null
+          rating: number
+          review_text?: string | null
+          review_type: string
+          reviewed_user_id?: string | null
+          reviewer_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          book_id?: string | null
+          created_at?: string | null
+          id?: string
+          purchase_request_id?: string | null
+          rating?: number
+          review_text?: string | null
+          review_type?: string
+          reviewed_user_id?: string | null
+          reviewer_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewed_user_id_fkey"
+            columns: ["reviewed_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
