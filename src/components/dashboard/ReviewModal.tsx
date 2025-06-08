@@ -53,13 +53,8 @@ export const ReviewModal = ({
         .eq('id', purchaseRequestId)
         .single();
 
-      // Use edge function to handle review insertion since we don't have the reviews table in types
-      const response = await fetch('/api/submit-review', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('create-review', {
+        body: {
           reviewer_id: user.id,
           reviewed_user_id: reviewedUserId,
           book_id: request?.book_id,
@@ -67,12 +62,10 @@ export const ReviewModal = ({
           rating,
           review_text: reviewText.trim() || null,
           review_type: reviewType
-        }),
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to submit review');
-      }
+      if (error) throw error;
 
       toast({
         title: "Success",

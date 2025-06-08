@@ -76,7 +76,7 @@ export const DeliveryConfirmationModal = ({
 
       toast({
         title: "OTP Sent",
-        description: "Delivery OTP has been sent to your notifications.",
+        description: "Delivery OTP has been sent to your email and notifications.",
       });
 
       fetchConfirmation();
@@ -107,6 +107,44 @@ export const DeliveryConfirmationModal = ({
 
       setOtpCode("");
       fetchConfirmation();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStripePayment = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-book-payment', {
+        body: { 
+          purchaseRequestId, 
+          amount: bookPrice 
+        }
+      });
+
+      if (error) throw error;
+
+      // Open Stripe checkout in new tab
+      if (data.url) {
+        window.open(data.url, '_blank');
+        
+        // Mark as paid via Stripe
+        await supabase.functions.invoke('process-final-payment', {
+          body: { 
+            purchaseRequestId, 
+            buyerConfirmed: true, 
+            paymentMethod: 'stripe' 
+          }
+        });
+
+        fetchConfirmation();
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -201,7 +239,7 @@ export const DeliveryConfirmationModal = ({
                       </Button>
                     ) : (
                       <div className="space-y-2">
-                        <Label htmlFor="otp">Enter OTP</Label>
+                        <Label htmlFor="otp">Enter OTP (Check Email)</Label>
                         <div className="flex space-x-2">
                           <Input
                             id="otp"
@@ -246,32 +284,38 @@ export const DeliveryConfirmationModal = ({
 
             <Separator />
 
-            {/* Step 3: Payment Confirmation */}
+            {/* Step 3: Payment */}
             <div className="flex items-start space-x-3">
               <StatusIcon status={getStepStatus(3)} />
               <div className="flex-1">
-                <h4 className="font-medium">3. Payment Confirmation</h4>
-                <p className="text-sm text-gray-600">Confirm payment method and completion</p>
+                <h4 className="font-medium">3. Payment</h4>
+                <p className="text-sm text-gray-600">Complete payment to seller</p>
                 
                 {confirmation?.otp_verified_at && (
                   <div className="mt-2 space-y-2">
                     {userType === 'buyer' && !confirmation.buyer_confirmed_payment && (
                       <div className="space-y-2">
-                        <p className="text-sm">Choose payment method:</p>
+                        <p className="text-sm font-medium">Choose payment method:</p>
                         <div className="flex space-x-2">
-                          <Button size="sm" onClick={() => confirmPayment('stripe')} disabled={loading}>
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Pay via Stripe
-                          </Button>
                           <Button 
                             size="sm" 
-                            variant="outline" 
-                            onClick={() => confirmPayment('other')} 
+                            onClick={handleStripePayment} 
                             disabled={loading}
+                            className="flex-1"
                           >
-                            Paid Other Way
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Pay ₹{bookPrice} via Stripe
                           </Button>
                         </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => confirmPayment('other')} 
+                          disabled={loading}
+                          className="w-full"
+                        >
+                          Paid Outside App
+                        </Button>
                       </div>
                     )}
                     

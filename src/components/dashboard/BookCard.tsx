@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,14 +20,17 @@ interface Book {
   profiles?: {
     full_name: string;
     location_address: string;
+    average_rating: number;
+    review_count: number;
   };
 }
 
 interface BookCardProps {
   book: Book;
+  onRequestPurchase: (book: Book) => void;
 }
 
-export const BookCard = ({ book }: BookCardProps) => {
+export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -105,6 +107,21 @@ export const BookCard = ({ book }: BookCardProps) => {
 
           {book.description && (
             <p className="text-sm text-gray-700 line-clamp-3">{book.description}</p>
+          )}
+
+          {/* Add seller rating */}
+          {book.profiles && (
+            <div className="pt-2 border-t">
+              <p className="text-sm text-gray-600 mb-1">Seller:</p>
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{book.profiles.full_name}</span>
+                <UserRating 
+                  rating={book.profiles.average_rating || 0} 
+                  reviewCount={book.profiles.review_count || 0} 
+                  size="sm"
+                />
+              </div>
+            </div>
           )}
 
           {canRequestBook ? (
