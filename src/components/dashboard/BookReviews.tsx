@@ -43,7 +43,7 @@ export const BookReviews = ({ bookId, sellerId }: BookReviewsProps) => {
           review_text,
           review_type,
           created_at,
-          reviewer:reviewer_id(full_name, email)
+          reviewer:profiles!reviews_reviewer_id_fkey(full_name, email)
         `)
         .eq('book_id', bookId)
         .order('created_at', { ascending: false });
