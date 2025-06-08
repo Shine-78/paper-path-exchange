@@ -1,8 +1,11 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Search, Plus, Library, MessageSquare, User, LogOut } from "lucide-react";
+import { BookOpen, Search, Plus, Library, MessageSquare, User, LogOut, Bell } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { DashboardView } from "./Dashboard";
+import { useState, useEffect } from "react";
+import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 interface HeaderProps {
   currentView: DashboardView;
@@ -10,9 +13,58 @@ interface HeaderProps {
 }
 
 export const Header = ({ currentView, setCurrentView }: HeaderProps) => {
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { playNotificationSound } = useNotificationSound();
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("read", false);
+
+      if (error) throw error;
+      setUnreadCount(data?.length || 0);
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCount();
+
+    // Set up real-time subscription for notifications
+    const channel = supabase
+      .channel('header_notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications'
+      }, (payload) => {
+        playNotificationSound();
+        fetchUnreadCount();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications'
+      }, (payload) => {
+        fetchUnreadCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [playNotificationSound]);
 
   const navItems = [
     { id: "discover", label: "Discover", icon: Search },
@@ -47,11 +99,29 @@ export const Header = ({ currentView, setCurrentView }: HeaderProps) => {
             ))}
           </nav>
 
-          {/* Sign Out */}
-          <Button variant="outline" onClick={handleSignOut} className="flex items-center space-x-2">
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign Out</span>
-          </Button>
+          {/* Notification Bell and Sign Out */}
+          <div className="flex items-center space-x-2">
+            <Button
+              variant={currentView === "notifications" ? "default" : "ghost"}
+              onClick={() => setCurrentView("notifications")}
+              className="relative"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <Badge 
+                  className="absolute -top-2 -right-2 bg-red-500 text-white text-xs min-w-[1.25rem] h-5 flex items-center justify-center rounded-full animate-pulse"
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Badge>
+              )}
+              <span className="hidden sm:inline ml-2">Notifications</span>
+            </Button>
+            
+            <Button variant="outline" onClick={handleSignOut} className="flex items-center space-x-2">
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </Button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}
@@ -68,6 +138,21 @@ export const Header = ({ currentView, setCurrentView }: HeaderProps) => {
                 <span className="text-xs">{label}</span>
               </Button>
             ))}
+            <Button
+              variant={currentView === "notifications" ? "default" : "ghost"}
+              onClick={() => setCurrentView("notifications")}
+              className="flex flex-col items-center space-y-1 h-auto py-2 px-3 relative"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <Badge 
+                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[1rem] h-4 flex items-center justify-center rounded-full"
+                >
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </Badge>
+              )}
+              <span className="text-xs">Alerts</span>
+            </Button>
           </div>
         </div>
       </div>

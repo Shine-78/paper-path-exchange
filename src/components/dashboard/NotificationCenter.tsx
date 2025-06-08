@@ -68,7 +68,7 @@ export const NotificationCenter = () => {
 
     // Set up real-time subscription
     const channel = supabase
-      .channel('notifications')
+      .channel('notifications_center')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -77,12 +77,19 @@ export const NotificationCenter = () => {
         playNotificationSound();
         fetchNotifications();
       })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications'
+      }, (payload) => {
+        fetchNotifications();
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [playNotificationSound]);
 
   const markAsRead = async (notificationId: string) => {
     try {
@@ -181,7 +188,7 @@ export const NotificationCenter = () => {
               <Bell className="h-5 w-5" />
               <span>Notifications</span>
               {unreadCount > 0 && (
-                <Badge className="bg-red-500 text-white">
+                <Badge className="bg-red-500 text-white animate-pulse">
                   {unreadCount}
                 </Badge>
               )}
@@ -209,7 +216,7 @@ export const NotificationCenter = () => {
           {notifications.map((notification) => (
             <Card 
               key={notification.id} 
-              className={`${!notification.read ? 'border-l-4 border-l-blue-500 bg-blue-50' : ''}`}
+              className={`${!notification.read ? 'border-l-4 border-l-blue-500 bg-blue-50 animate-fade-in' : ''} transition-all duration-300`}
             >
               <CardContent className="p-4">
                 <div className="flex justify-between items-start">
@@ -220,7 +227,7 @@ export const NotificationCenter = () => {
                         {notification.priority}
                       </Badge>
                       {!notification.read && (
-                        <Badge variant="secondary">New</Badge>
+                        <Badge variant="secondary" className="animate-pulse">New</Badge>
                       )}
                     </div>
                     <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
