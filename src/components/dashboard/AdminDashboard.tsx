@@ -54,8 +54,9 @@ export const AdminDashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      // Temporary: check if user email contains admin
-      return user?.email?.includes('admin') || false;
+      // Check if user email is admin@bookex.com or contains 'admin'
+      const isAdminUser = user?.email === 'admin@bookex.com' || user?.email?.includes('admin') || false;
+      return isAdminUser;
     } catch {
       return false;
     }
@@ -204,6 +205,9 @@ export const AdminDashboard = () => {
           <Ban className="h-12 w-12 text-red-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Denied</h3>
           <p className="text-gray-600">You don't have admin privileges to access this dashboard.</p>
+          <p className="text-sm text-gray-500 mt-2">
+            To access admin dashboard, use an email with 'admin' in it or contact the administrator.
+          </p>
         </CardContent>
       </Card>
     );

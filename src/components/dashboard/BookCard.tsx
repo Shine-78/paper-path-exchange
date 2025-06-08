@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,12 +36,15 @@ export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Get current user
-  useState(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+  // Get current user properly
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
       setCurrentUserId(user?.id || null);
-    });
-  });
+    };
+    
+    getCurrentUser();
+  }, []);
 
   const getConditionColor = (condition: string) => {
     switch (condition) {
@@ -141,7 +144,7 @@ export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
         </CardContent>
       </Card>
 
-      {canRequestBook && onRequestPurchase && (
+      {canRequestBook && (
         <PurchaseRequestModal
           isOpen={isRequestModalOpen}
           onClose={() => setIsRequestModalOpen(false)}
