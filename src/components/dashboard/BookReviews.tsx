@@ -21,20 +21,17 @@ interface Review {
 interface BookReviewsProps {
   bookId: string;
   sellerId: string;
+  key?: string | number; // Add key prop to force re-render
 }
 
-export const BookReviews = ({ bookId, sellerId }: BookReviewsProps) => {
+export const BookReviews = ({ bookId, sellerId, key }: BookReviewsProps) => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [sellerRating, setSellerRating] = useState({ rating: 0, count: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchReviews();
-    fetchSellerRating();
-  }, [bookId, sellerId]);
-
   const fetchReviews = async () => {
     try {
+      console.log('Fetching reviews for book:', bookId);
       const { data, error } = await supabase
         .from('reviews')
         .select(`
@@ -48,7 +45,12 @@ export const BookReviews = ({ bookId, sellerId }: BookReviewsProps) => {
         .eq('book_id', bookId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching reviews:', error);
+        throw error;
+      }
+      
+      console.log('Fetched reviews:', data);
       setReviews(data || []);
     } catch (error) {
       console.error('Error fetching reviews:', error);
@@ -57,14 +59,20 @@ export const BookReviews = ({ bookId, sellerId }: BookReviewsProps) => {
 
   const fetchSellerRating = async () => {
     try {
+      console.log('Fetching seller rating for:', sellerId);
       const { data, error } = await supabase
         .from('profiles')
         .select('average_rating, review_count')
         .eq('id', sellerId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching seller rating:', error);
+        throw error;
+      }
+      
       if (data) {
+        console.log('Seller rating data:', data);
         setSellerRating({
           rating: data.average_rating || 0,
           count: data.review_count || 0
@@ -76,6 +84,13 @@ export const BookReviews = ({ bookId, sellerId }: BookReviewsProps) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (bookId && sellerId) {
+      fetchReviews();
+      fetchSellerRating();
+    }
+  }, [bookId, sellerId, key]);
 
   if (loading) {
     return <div className="animate-pulse h-32 bg-gray-200 rounded"></div>;
@@ -101,7 +116,7 @@ export const BookReviews = ({ bookId, sellerId }: BookReviewsProps) => {
       {reviews.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Recent Reviews</CardTitle>
+            <CardTitle className="text-lg">Recent Reviews ({reviews.length})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {reviews.map((review) => (
@@ -132,6 +147,14 @@ export const BookReviews = ({ bookId, sellerId }: BookReviewsProps) => {
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+      
+      {reviews.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-gray-500">No reviews yet for this book</p>
           </CardContent>
         </Card>
       )}

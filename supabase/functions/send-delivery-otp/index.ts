@@ -30,13 +30,14 @@ serve(async (req) => {
       .select(`
         *,
         books!inner(title),
-        buyer:buyer_id(email, full_name),
-        seller:seller_id(email, full_name)
+        buyer:profiles!purchase_requests_buyer_id_fkey(email, full_name),
+        seller:profiles!purchase_requests_seller_id_fkey(email, full_name)
       `)
       .eq('id', purchaseRequestId)
       .single();
 
     if (requestError || !request) {
+      console.error('Purchase request error:', requestError);
       throw new Error('Purchase request not found');
     }
 
@@ -50,50 +51,12 @@ serve(async (req) => {
         otp_code: otpCode
       });
 
-    if (insertError) throw insertError;
-
-    // Send actual email using Supabase Auth email service
-    try {
-      const { error: emailError } = await supabaseService.auth.admin.sendRawEmail({
-        to: request.buyer.email,
-        subject: `BookEx Delivery OTP - ${request.books.title}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2563eb; text-align: center;">BookEx Delivery Confirmation</h2>
-            <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3>Hello ${request.buyer.full_name},</h3>
-              <p>Your delivery OTP for <strong>"${request.books.title}"</strong> is ready.</p>
-              
-              <div style="text-align: center; margin: 30px 0;">
-                <div style="background-color: #2563eb; color: white; padding: 15px 30px; border-radius: 8px; display: inline-block; font-size: 24px; font-weight: bold; letter-spacing: 3px;">
-                  ${otpCode}
-                </div>
-              </div>
-              
-              <p>Please enter this OTP in the BookEx app to confirm delivery and proceed with payment.</p>
-              <p><strong>This OTP is valid for 30 minutes only.</strong></p>
-              
-              <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
-              <p style="font-size: 12px; color: #64748b;">
-                If you didn't request this OTP, please ignore this email.<br>
-                This is an automated email from BookEx - India's Book Exchange Platform.
-              </p>
-            </div>
-          </div>
-        `,
-        text: `BookEx Delivery OTP: ${otpCode} for "${request.books.title}". Valid for 30 minutes.`
-      });
-
-      if (emailError) {
-        console.log('Email sending failed, falling back to notification:', emailError);
-      } else {
-        console.log(`OTP email sent successfully to ${request.buyer.email}`);
-      }
-    } catch (emailError) {
-      console.log('Email service error, using notification fallback:', emailError);
+    if (insertError) {
+      console.error('Insert error:', insertError);
+      throw insertError;
     }
 
-    // Create notification as backup
+    // Create notification for buyer
     await supabaseService
       .from('notifications')
       .insert({
@@ -109,7 +72,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'OTP sent successfully to email and notifications',
+      message: 'OTP sent successfully to notifications',
       otp: otpCode // Remove this in production
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

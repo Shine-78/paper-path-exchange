@@ -15,6 +15,7 @@ interface ReviewModalProps {
   reviewedUserName: string;
   bookTitle: string;
   reviewType: 'buyer_to_seller' | 'seller_to_buyer';
+  onReviewSubmitted?: () => void;
 }
 
 export const ReviewModal = ({
@@ -24,7 +25,8 @@ export const ReviewModal = ({
   reviewedUserId,
   reviewedUserName,
   bookTitle,
-  reviewType
+  reviewType,
+  onReviewSubmitted
 }: ReviewModalProps) => {
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
@@ -47,11 +49,26 @@ export const ReviewModal = ({
       if (!user) throw new Error("Not authenticated");
 
       // Get book_id from purchase request
-      const { data: request } = await supabase
+      const { data: request, error: requestError } = await supabase
         .from('purchase_requests')
         .select('book_id')
         .eq('id', purchaseRequestId)
         .single();
+
+      if (requestError) {
+        console.error('Error fetching purchase request:', requestError);
+        throw new Error('Could not find purchase request');
+      }
+
+      console.log('Submitting review with data:', {
+        reviewer_id: user.id,
+        reviewed_user_id: reviewedUserId,
+        book_id: request?.book_id,
+        purchase_request_id: purchaseRequestId,
+        rating,
+        review_text: reviewText.trim() || null,
+        review_type: reviewType
+      });
 
       const { data, error } = await supabase.functions.invoke('create-review', {
         body: {
@@ -65,20 +82,31 @@ export const ReviewModal = ({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Review submission error:', error);
+        throw error;
+      }
+
+      console.log('Review submitted successfully:', data);
 
       toast({
         title: "Success",
         description: "Review submitted successfully",
       });
 
+      // Call the callback to refresh reviews
+      if (onReviewSubmitted) {
+        onReviewSubmitted();
+      }
+
       onClose();
       setRating(0);
       setReviewText("");
     } catch (error: any) {
+      console.error('Error submitting review:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to submit review",
         variant: "destructive",
       });
     } finally {

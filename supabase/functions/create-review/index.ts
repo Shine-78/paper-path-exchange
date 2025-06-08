@@ -29,8 +29,18 @@ serve(async (req) => {
       review_type 
     } = await req.json();
 
+    console.log('Creating review with data:', {
+      reviewer_id, 
+      reviewed_user_id, 
+      book_id, 
+      purchase_request_id, 
+      rating, 
+      review_text, 
+      review_type
+    });
+
     // Insert review
-    const { data, error } = await supabaseService
+    const { data: reviewData, error: reviewError } = await supabaseService
       .from('reviews')
       .insert({
         reviewer_id,
@@ -44,27 +54,40 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (reviewError) {
+      console.error('Review insert error:', reviewError);
+      throw reviewError;
+    }
+
+    console.log('Review created successfully:', reviewData);
 
     // Update user's average rating
-    const { data: avgRating } = await supabaseService
+    const { data: allReviews, error: reviewsError } = await supabaseService
       .from('reviews')
       .select('rating')
       .eq('reviewed_user_id', reviewed_user_id);
 
-    if (avgRating && avgRating.length > 0) {
-      const average = avgRating.reduce((sum, review) => sum + review.rating, 0) / avgRating.length;
+    if (reviewsError) {
+      console.error('Error fetching reviews for rating calculation:', reviewsError);
+    } else if (allReviews && allReviews.length > 0) {
+      const average = allReviews.reduce((sum, review) => sum + review.rating, 0) / allReviews.length;
       
-      await supabaseService
+      const { error: updateError } = await supabaseService
         .from('profiles')
         .update({ 
           average_rating: Math.round(average * 10) / 10,
-          review_count: avgRating.length
+          review_count: allReviews.length
         })
         .eq('id', reviewed_user_id);
+
+      if (updateError) {
+        console.error('Error updating user rating:', updateError);
+      } else {
+        console.log(`Updated user ${reviewed_user_id} rating to ${average} with ${allReviews.length} reviews`);
+      }
     }
 
-    return new Response(JSON.stringify({ success: true, review: data }), {
+    return new Response(JSON.stringify({ success: true, review: reviewData }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
