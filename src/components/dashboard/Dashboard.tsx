@@ -1,7 +1,8 @@
 
 import { useState } from "react";
 import { User } from "@supabase/supabase-js";
-import { Header } from "./Header";
+import { MobileHeader } from "./MobileHeader";
+import { MobileBottomNav } from "./MobileBottomNav";
 import { BookDiscovery } from "./BookDiscovery";
 import { SellBook } from "./SellBook";
 import { MyBooks } from "./MyBooks";
@@ -44,11 +45,14 @@ export const Dashboard = ({ user }: DashboardProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header currentView={currentView} setCurrentView={setCurrentView} />
-      <main className="container mx-auto px-4 py-6">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <MobileHeader currentView={currentView} setCurrentView={setCurrentView} />
+      
+      <main className="flex-1 px-4 py-4 pb-20 overflow-y-auto">
         {renderContent()}
       </main>
+      
+      <MobileBottomNav currentView={currentView} setCurrentView={setCurrentView} />
     </div>
   );
 };

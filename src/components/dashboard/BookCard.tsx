@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,66 +59,69 @@ export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow">
+      <Card className="hover:shadow-lg transition-shadow touch-manipulation">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg line-clamp-2">{book.title}</CardTitle>
+          <CardTitle className="text-lg line-clamp-2 leading-tight">{book.title}</CardTitle>
           <p className="text-sm text-gray-600">by {book.author}</p>
         </CardHeader>
         
         <CardContent className="space-y-4">
-          {/* Book Image */}
+          {/* Book Image - Optimized for mobile */}
           {book.images && book.images.length > 0 ? (
-            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+            <div className="aspect-[4/3] bg-gray-100 rounded-lg flex items-center justify-center">
               <img
                 src={book.images[0]}
                 alt={book.title}
                 className="max-h-full max-w-full object-contain rounded-lg"
+                loading="lazy"
               />
             </div>
           ) : (
-            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+            <div className="aspect-[4/3] bg-gray-100 rounded-lg flex items-center justify-center">
               <span className="text-gray-400 text-sm">No image</span>
             </div>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold text-green-600">₹{book.price_range}</span>
+              <span className="text-xl font-bold text-green-600">₹{book.price_range}</span>
               <Badge className={getConditionColor(book.condition)}>
                 {book.condition.charAt(0).toUpperCase() + book.condition.slice(1)}
               </Badge>
             </div>
             
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Transfer:</span>
-              <span className="capitalize">{book.transfer_type.replace("-", " ")}</span>
+            <div className="flex justify-between text-sm bg-gray-50 p-3 rounded-lg">
+              <span className="text-gray-600 font-medium">Transfer:</span>
+              <span className="capitalize font-medium">{book.transfer_type.replace("-", " ")}</span>
             </div>
             
             {book.profiles?.full_name && (
-              <div className="flex items-center text-sm text-gray-600">
-                <User className="h-4 w-4 mr-1" />
-                <span>{book.profiles.full_name}</span>
+              <div className="flex items-center text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                <User className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="font-medium">{book.profiles.full_name}</span>
               </div>
             )}
             
             {(book.location_address || book.profiles?.location_address) && (
-              <div className="flex items-center text-sm text-gray-600">
-                <MapPin className="h-4 w-4 mr-1" />
-                <span>{book.location_address || book.profiles?.location_address}</span>
+              <div className="flex items-center text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="font-medium">{book.location_address || book.profiles?.location_address}</span>
               </div>
             )}
           </div>
 
           {book.description && (
-            <p className="text-sm text-gray-700 line-clamp-3">{book.description}</p>
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-700 line-clamp-3">{book.description}</p>
+            </div>
           )}
 
-          {/* Add seller rating */}
+          {/* Seller rating - Mobile optimized */}
           {book.profiles && (
-            <div className="pt-2 border-t">
-              <p className="text-sm text-gray-600 mb-1">Seller:</p>
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{book.profiles.full_name}</span>
+            <div className="pt-3 border-t">
+              <p className="text-sm text-gray-600 mb-2 font-medium">Seller Rating:</p>
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                <span className="font-medium text-gray-800">{book.profiles.full_name}</span>
                 <UserRating 
                   rating={book.profiles.average_rating || 0} 
                   reviewCount={book.profiles.review_count || 0} 
@@ -132,12 +134,12 @@ export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
           {canRequestBook ? (
             <Button 
               onClick={() => setIsRequestModalOpen(true)} 
-              className="w-full"
+              className="w-full h-12 text-lg font-semibold bg-blue-600 hover:bg-blue-700 touch-manipulation"
             >
               Request to Buy
             </Button>
           ) : (
-            <Button disabled className="w-full">
+            <Button disabled className="w-full h-12 text-lg touch-manipulation">
               {currentUserId === book.seller_id ? "Your Book" : "Login to Request"}
             </Button>
           )}
