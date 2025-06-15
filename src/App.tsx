@@ -30,7 +30,8 @@ const App = () => {
 
     // Add mobile app styling
     document.body.style.overscrollBehavior = 'none';
-    document.body.style.webkitOverflowScrolling = 'touch';
+    // Type assertion for webkit-specific property
+    (document.body.style as any).webkitOverflowScrolling = 'touch';
   }, []);
 
   return (
