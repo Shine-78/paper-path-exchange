@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,26 +48,26 @@ export const Requests = (props) => {
         .select(`
           id, book_id, buyer_id, seller_id, status, created_at,
           books (title, price_range),
-          profiles (full_name, location_address, latitude, longitude)
+          buyer_profile:profiles!buyer_id (full_name, location_address, latitude, longitude)
         `)
         .eq("seller_id", props.userId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      const enrichedRequests = data.map(request => ({
+      const enrichedRequests: PurchaseRequest[] = data.map(request => ({
         id: request.id,
         book_id: request.book_id,
         buyer_id: request.buyer_id,
         seller_id: request.seller_id,
-        status: request.status,
+        status: request.status as 'pending' | 'accepted' | 'rejected' | 'completed',
         created_at: request.created_at,
         book_title: request.books?.title,
         book_price: request.books?.price_range,
-        buyer_name: request.profiles?.full_name,
-        buyer_location: request.profiles?.location_address,
-        buyer_latitude: request.profiles?.latitude,
-        buyer_longitude: request.profiles?.longitude,
+        buyer_name: request.buyer_profile?.full_name,
+        buyer_location: request.buyer_profile?.location_address,
+        buyer_latitude: request.buyer_profile?.latitude,
+        buyer_longitude: request.buyer_profile?.longitude,
         seller_latitude: props.userProfile?.latitude,
         seller_longitude: props.userProfile?.longitude,
       }));
