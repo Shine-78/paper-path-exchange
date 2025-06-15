@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { User } from "@supabase/supabase-js";
 import { Header } from "./Header";
 import { MobileHeader } from "./MobileHeader";
 import { MobileBottomNav } from "./MobileBottomNav";
@@ -15,9 +16,14 @@ import { PWAInstallPrompt } from "../pwa/PWAInstallPrompt";
 import { OfflineIndicator } from "../pwa/OfflineIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DashboardView } from "@/types/dashboard";
 
-export const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState("discover");
+interface DashboardProps {
+  user: User | null;
+}
+
+export const Dashboard = ({ user }: DashboardProps) => {
+  const [currentView, setCurrentView] = useState<DashboardView>("discover");
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
@@ -56,7 +62,7 @@ export const Dashboard = () => {
   }, []);
 
   const renderContent = () => {
-    switch (activeTab) {
+    switch (currentView) {
       case "discover":
         return <BookDiscovery />;
       case "sell":
@@ -66,7 +72,7 @@ export const Dashboard = () => {
       case "requests":
         return <Requests />;
       case "profile":
-        return <Profile />;
+        return <Profile user={user} />;
       case "notifications":
         return <NotificationCenter />;
       case "admin":
@@ -86,8 +92,8 @@ export const Dashboard = () => {
       {/* Desktop Header */}
       <div className="hidden md:block">
         <Header 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
+          currentView={currentView} 
+          setCurrentView={setCurrentView} 
           isAdmin={isAdmin}
         />
       </div>
@@ -95,8 +101,8 @@ export const Dashboard = () => {
       {/* Mobile Header */}
       <div className="md:hidden">
         <MobileHeader 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab}
+          currentView={currentView} 
+          setCurrentView={setCurrentView}
         />
       </div>
 
@@ -108,8 +114,8 @@ export const Dashboard = () => {
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden">
         <MobileBottomNav 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab}
+          currentView={currentView} 
+          setCurrentView={setCurrentView}
           isAdmin={isAdmin}
         />
       </div>

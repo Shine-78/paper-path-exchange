@@ -1,11 +1,12 @@
 
 import { Button } from "@/components/ui/button";
 import { Search, Plus, Library, MessageSquare, User } from "lucide-react";
-import { DashboardView } from "./Dashboard";
+import { DashboardView } from "@/types/dashboard";
 
 interface MobileBottomNavProps {
   currentView: DashboardView;
   setCurrentView: (view: DashboardView) => void;
+  isAdmin?: boolean;
 }
 
 export const MobileBottomNav = ({ currentView, setCurrentView }: MobileBottomNavProps) => {

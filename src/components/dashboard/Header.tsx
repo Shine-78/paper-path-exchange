@@ -3,16 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Search, Plus, Library, MessageSquare, User, LogOut, Bell } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { DashboardView } from "./Dashboard";
+import { DashboardView } from "@/types/dashboard";
 import { useState, useEffect } from "react";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 interface HeaderProps {
   currentView: DashboardView;
   setCurrentView: (view: DashboardView) => void;
+  isAdmin?: boolean;
 }
 
-export const Header = ({ currentView, setCurrentView }: HeaderProps) => {
+export const Header = ({ currentView, setCurrentView, isAdmin }: HeaderProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { playNotificationSound } = useNotificationSound();
 

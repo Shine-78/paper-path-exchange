@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Bell, Settings, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { DashboardView } from "./Dashboard";
+import { DashboardView } from "@/types/dashboard";
 import { useState, useEffect } from "react";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 import {
