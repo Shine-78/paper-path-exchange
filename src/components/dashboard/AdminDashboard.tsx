@@ -71,11 +71,9 @@ export const AdminDashboard = () => {
       }
       if (adminUsers && adminUsers.length > 0) return true;
 
-      // Fallback: allow legacy email-based access
+      // Fallback: allow email-based access for this specific admin only
       const isAdminUser =
-        user.email === "admin@bookex.com" ||
-        user.email === "admin9977@gmail.com" ||
-        user.email?.includes("admin") ||
+        user.email === "arnabmanna203@gmail.com" ||
         false;
       return isAdminUser;
     } catch {
