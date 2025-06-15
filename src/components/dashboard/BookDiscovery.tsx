@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -83,32 +82,31 @@ export const BookDiscovery = () => {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      // Simplified query without complex nested joins to avoid TS errors
-      let booksQuery = supabase
-        .from("books")
-        .select("*")
-        .eq("status", "available");
+      // Build query parameters as an object to avoid complex type inference
+      const queryParams: any = {
+        status: "available"
+      };
 
+      if (selectedGenre) queryParams.genre = selectedGenre;
+      if (selectedYear) queryParams.publication_year = Number(selectedYear);
+      if (selectedISBN) queryParams.isbn = selectedISBN;
+      if (selectedCondition) queryParams.condition = selectedCondition;
+      if (selectedPriceRange) queryParams.price_range = selectedPriceRange;
+
+      // Start with base query
+      let query = supabase.from("books").select("*");
+
+      // Apply filters one by one
+      Object.entries(queryParams).forEach(([key, value]) => {
+        query = query.eq(key, value);
+      });
+
+      // Handle search term separately
       if (searchTerm) {
-        booksQuery = booksQuery.or(`title.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
-      }
-      if (selectedGenre) {
-        booksQuery = booksQuery.eq("genre", selectedGenre);
-      }
-      if (selectedYear) {
-        booksQuery = booksQuery.eq("publication_year", Number(selectedYear));
-      }
-      if (selectedISBN) {
-        booksQuery = booksQuery.eq("isbn", selectedISBN);
-      }
-      if (selectedCondition) {
-        booksQuery = booksQuery.eq("condition", selectedCondition);
-      }
-      if (selectedPriceRange) {
-        booksQuery = booksQuery.eq("price_range", selectedPriceRange);
+        query = query.or(`title.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
       }
 
-      const { data: booksData, error: booksError } = await booksQuery.order("created_at", { ascending: false });
+      const { data: booksData, error: booksError } = await query.order("created_at", { ascending: false });
 
       if (booksError) throw booksError;
 
