@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -82,48 +83,60 @@ export const BookDiscovery = () => {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      // Simplified query without complex nested joins to avoid TS errors
+      let booksQuery = supabase
         .from("books")
-        .select(`
-          *,
-          profiles:seller_id (
-            full_name,
-            location_address,
-            average_rating,
-            review_count
-          )
-        `)
+        .select("*")
         .eq("status", "available");
 
       if (searchTerm) {
-        query = query.or(`title.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
+        booksQuery = booksQuery.or(`title.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
       }
       if (selectedGenre) {
-        query = query.eq("genre", selectedGenre);
+        booksQuery = booksQuery.eq("genre", selectedGenre);
       }
       if (selectedYear) {
-        query = query.eq("publication_year", Number(selectedYear));
+        booksQuery = booksQuery.eq("publication_year", Number(selectedYear));
       }
       if (selectedISBN) {
-        query = query.eq("isbn", selectedISBN);
+        booksQuery = booksQuery.eq("isbn", selectedISBN);
       }
       if (selectedCondition) {
-        query = query.eq("condition", selectedCondition);
+        booksQuery = booksQuery.eq("condition", selectedCondition);
       }
       if (selectedPriceRange) {
-        query = query.eq("price_range", selectedPriceRange);
+        booksQuery = booksQuery.eq("price_range", selectedPriceRange);
       }
 
-      // Don't force a type on result here, let TS infer as 'any'
-      const { data, error } = await query.order("created_at", { ascending: false });
+      const { data: booksData, error: booksError } = await booksQuery.order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (booksError) throw booksError;
 
-      // Explicitly type data as Book[] at point-of-use
-      let filteredBooks: Book[] = (data ?? []) as Book[];
+      // Fetch profiles separately to avoid complex type inference
+      const sellerIds = booksData?.map(book => book.seller_id).filter(Boolean) || [];
+      let profilesData: any[] = [];
+      
+      if (sellerIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, full_name, location_address, average_rating, review_count")
+          .in("id", sellerIds);
+        
+        if (!profilesError) {
+          profilesData = profiles || [];
+        }
+      }
+
+      // Combine books with profiles manually
+      const booksWithProfiles: Book[] = (booksData || []).map(book => ({
+        ...book,
+        profiles: profilesData.find(profile => profile.id === book.seller_id)
+      }));
+
       // Filter by radius (if user location is available)
+      let filteredBooks = booksWithProfiles;
       if (userCoords && selectedRadius) {
-        filteredBooks = filteredBooks.filter((book) => {
+        filteredBooks = booksWithProfiles.filter((book) => {
           if (book.latitude && book.longitude) {
             const dist = haversineDistance(
               userCoords.lat,
@@ -136,6 +149,7 @@ export const BookDiscovery = () => {
           return false;
         });
       }
+      
       setBooks(filteredBooks);
 
       // Save to search history
