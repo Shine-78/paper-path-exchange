@@ -54,10 +54,10 @@ export const RefundSystem = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Create refund request
+      // Create refund request notification using 'general' type instead of 'refund_request'
       const { error } = await supabase.from("notifications").insert({
         user_id: user.id, // This would go to admin in real implementation
-        type: 'refund_request',
+        type: 'general', // Using 'general' type which should be allowed by the constraint
         title: 'Refund Request',
         message: `Refund requested for "${bookTitle}" - Amount: ₹${amount} - Reason: ${reason === "Other" ? customReason : reason}`,
         related_id: purchaseRequestId,
