@@ -1,8 +1,8 @@
-
 import React from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { locationService } from "@/services/locationService";
 import { MapPin, Navigation, Clock, Car } from "lucide-react";
 
 // Fix for default markers in Leaflet with Webpack
@@ -21,6 +21,7 @@ interface Point {
 interface LeafletBookRouteMapProps {
   buyer?: Point | null;
   seller?: Point | null;
+  showUserLocation?: boolean;
 }
 
 // Custom icons for buyer and seller
@@ -87,8 +88,11 @@ function getDirection(lat1: number, lon1: number, lat2: number, lon2: number) {
 export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
   buyer,
   seller,
+  showUserLocation = true,
 }) => {
   console.log('LeafletBookRouteMap rendered with:', { buyer, seller });
+
+  const userLocation = locationService.getCachedLocation();
 
   if (!buyer || !seller) {
     return (
@@ -101,6 +105,11 @@ export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
           Buyer: {buyer ? '✓ Available' : '✗ Missing'}, 
           Seller: {seller ? '✓ Available' : '✗ Missing'}
         </p>
+        {userLocation && (
+          <p className="text-sm text-green-700 mt-2">
+            📍 Your location: Available for distance calculations
+          </p>
+        )}
       </div>
     );
   }
@@ -121,15 +130,25 @@ export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
     seller.latitude,
     seller.longitude
   );
-  
-  const travelTime = estimateTravelTime(distance);
-  const direction = getDirection(
-    buyer.latitude,
-    buyer.longitude,
-    seller.latitude,
-    seller.longitude
-  );
 
+  // Calculate distances from user location if available
+  let distanceFromUser = null;
+  let distanceFromUserToSeller = null;
+  if (userLocation) {
+    distanceFromUser = haversineDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      buyer.latitude,
+      buyer.longitude
+    );
+    distanceFromUserToSeller = haversineDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      seller.latitude,
+      seller.longitude
+    );
+  }
+  
   // Calculate appropriate zoom level based on distance
   const getZoomLevel = (distKm: number) => {
     if (distKm < 1) return 15;
@@ -148,7 +167,10 @@ export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
     distance: distance.toFixed(1),
     travelTime,
     direction,
-    zoom: zoomLevel
+    zoom: zoomLevel,
+    userLocation,
+    distanceFromUser: distanceFromUser?.toFixed(1),
+    distanceFromUserToSeller: distanceFromUserToSeller?.toFixed(1)
   });
 
   return (
@@ -162,6 +184,7 @@ export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
           <div>
             <p className="text-sm text-gray-600">Distance</p>
             <p className="font-bold text-lg text-purple-700">{distance.toFixed(1)} km</p>
+            <p className="text-xs text-gray-500">Buyer ↔ Seller</p>
           </div>
         </div>
         
@@ -172,6 +195,7 @@ export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
           <div>
             <p className="text-sm text-gray-600">Est. Travel Time</p>
             <p className="font-bold text-lg text-blue-700">{travelTime}</p>
+            <p className="text-xs text-gray-500">Average speed</p>
           </div>
         </div>
         
@@ -182,9 +206,37 @@ export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
           <div>
             <p className="text-sm text-gray-600">Direction</p>
             <p className="font-bold text-lg text-green-700">{direction}</p>
+            <p className="text-xs text-gray-500">From buyer</p>
           </div>
         </div>
       </div>
+
+      {/* User Location Distance Info */}
+      {userLocation && (distanceFromUser || distanceFromUserToSeller) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gradient-to-r from-orange-50 to-pink-50 rounded-lg border border-orange-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 rounded-full">
+              <MapPin className="w-5 h-5 text-orange-700" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Distance to Buyer</p>
+              <p className="font-bold text-lg text-orange-700">{distanceFromUser?.toFixed(1)} km</p>
+              <p className="text-xs text-gray-500">From your location</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-pink-100 rounded-full">
+              <MapPin className="w-5 h-5 text-pink-700" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Distance to Seller</p>
+              <p className="font-bold text-lg text-pink-700">{distanceFromUserToSeller?.toFixed(1)} km</p>
+              <p className="text-xs text-gray-500">From your location</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Location Details */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -226,6 +278,40 @@ export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             maxZoom={18}
           />
+          
+          {/* User Location Marker (if available) */}
+          {userLocation && showUserLocation && (
+            <Marker 
+              position={[userLocation.latitude, userLocation.longitude]} 
+              icon={new L.Icon({
+                iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+                shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41],
+              })}
+            >
+              <Popup>
+                <div className="p-2">
+                  <div className="font-bold text-red-700 mb-1">📍 Your Location</div>
+                  <div className="text-sm space-y-1">
+                    <p><strong>Coordinates:</strong></p>
+                    <p>Lat: {userLocation.latitude.toFixed(6)}</p>
+                    <p>Lng: {userLocation.longitude.toFixed(6)}</p>
+                    {userLocation.accuracy && (
+                      <p className="mt-2 text-red-600">
+                        <strong>Accuracy:</strong> ±{Math.round(userLocation.accuracy)}m
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Popup>
+              <Tooltip direction="top" offset={[0, -41]} opacity={1}>
+                <span className="font-semibold">Your Location</span>
+              </Tooltip>
+            </Marker>
+          )}
           
           {/* Buyer Marker */}
           <Marker position={positions[0]} icon={buyerIcon}>

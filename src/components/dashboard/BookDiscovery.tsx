@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +7,8 @@ import { BookCard } from "./BookCard";
 import { Search, MapPin, Filter, BookOpen, Sparkles, Grid3X3, List } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { LocationPermissionDialog } from "@/components/location/LocationPermissionDialog";
+import { locationService, LocationData } from "@/services/locationService";
 
 interface Book {
   id: string;
@@ -60,6 +61,7 @@ export const BookDiscovery = () => {
   const [selectedPriceRange, setSelectedPriceRange] = useState<number | "">("");
   const [selectedRadius, setSelectedRadius] = useState<number | "">(10);
   const [userCoords, setUserCoords] = useState<{lat: number; lng: number} | null>(null);
+  const [userLocation, setUserLocation] = useState<LocationData | null>(null);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [savedSearches, setSavedSearches] = useState<{label: string, filters: any}[]>([]);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
@@ -68,16 +70,24 @@ export const BookDiscovery = () => {
 
   // Geolocation
   useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        },
-        () => {},
-        { enableHighAccuracy: false }
-      );
+    const cachedLocation = locationService.getCachedLocation();
+    if (cachedLocation) {
+      setUserLocation(cachedLocation);
+      setUserCoords({ lat: cachedLocation.latitude, lng: cachedLocation.longitude });
     }
   }, []);
+
+  const handleLocationGranted = (location: LocationData) => {
+    setUserLocation(location);
+    setUserCoords({ lat: location.latitude, lng: location.longitude });
+    console.log('User location granted:', location);
+  };
+
+  const handleLocationDenied = () => {
+    setUserLocation(null);
+    setUserCoords(null);
+    console.log('User location denied');
+  };
 
   // Fetch books with advanced filters
   const fetchBooks = async () => {
@@ -211,6 +221,10 @@ export const BookDiscovery = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex justify-center items-center">
+        <LocationPermissionDialog 
+          onLocationGranted={handleLocationGranted}
+          onLocationDenied={handleLocationDenied}
+        />
         <div className="text-center space-y-4">
           <div className="relative">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
@@ -224,6 +238,11 @@ export const BookDiscovery = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <LocationPermissionDialog 
+        onLocationGranted={handleLocationGranted}
+        onLocationDenied={handleLocationDenied}
+      />
+      
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 text-white">
         <div className="absolute inset-0 bg-black/20"></div>
@@ -338,7 +357,7 @@ export const BookDiscovery = () => {
                 />
               </div>
 
-              {/* Location Filter */}
+              {/* Location Filter - Updated to show user location status */}
               <div className="flex items-center space-x-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
                 <MapPin className="h-5 w-5 text-blue-500" />
                 <span className="font-medium text-gray-700">Within</span>
@@ -356,10 +375,27 @@ export const BookDiscovery = () => {
                   <option value={9999}>Any distance</option>
                 </select>
                 <span className="font-medium text-gray-700">of me</span>
-                {!userCoords && (
-                  <span className="text-xs text-gray-500 bg-yellow-100 px-2 py-1 rounded-full">
-                    📍 Enable location for better results
+                {userLocation ? (
+                  <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    Location enabled
                   </span>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const location = await locationService.requestLocationPermission();
+                        handleLocationGranted(location);
+                      } catch (error) {
+                        handleLocationDenied();
+                      }
+                    }}
+                    className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-300"
+                  >
+                    📍 Enable location
+                  </Button>
                 )}
               </div>
             </div>
