@@ -15,7 +15,7 @@ interface DashboardStats {
   revenue: number;
 }
 
-interface User {
+interface UserProfile {
   id: string;
   email: string;
   full_name?: string;
@@ -44,7 +44,7 @@ export const AdminDashboard = () => {
     totalTransactions: 0,
     revenue: 0
   });
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -124,7 +124,7 @@ export const AdminDashboard = () => {
       if (error) throw error;
       
       // Map the data to include default values for missing properties
-      const mappedUsers: User[] = (data || []).map(user => ({
+      const mappedUsers: UserProfile[] = (data || []).map(user => ({
         id: user.id,
         email: user.email,
         full_name: user.full_name,
