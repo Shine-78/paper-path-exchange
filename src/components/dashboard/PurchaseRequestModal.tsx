@@ -109,9 +109,41 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
     }
   };
 
-  const availableTransferModes = book.transfer_type === "both" 
-    ? ["self-transfer", "shipping"]
-    : [book.transfer_type];
+  // Map book transfer_type to available transfer modes for purchase requests
+  const getAvailableTransferModes = () => {
+    switch (book.transfer_type) {
+      case "both":
+        return ["self-transfer", "shipping"];
+      case "self-transfer":
+        return ["self-transfer"];
+      case "shipping":
+        return ["shipping"];
+      case "pickup":
+        return ["pickup"];
+      default:
+        return ["self-transfer"];
+    }
+  };
+
+  const availableTransferModes = getAvailableTransferModes();
+
+  // Set default transfer mode to first available option
+  if (!availableTransferModes.includes(transferMode)) {
+    setTransferMode(availableTransferModes[0]);
+  }
+
+  const getTransferModeLabel = (mode: string) => {
+    switch (mode) {
+      case "self-transfer":
+        return "Self Transfer";
+      case "shipping":
+        return "Shipping";
+      case "pickup":
+        return "Pickup";
+      default:
+        return mode;
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -151,8 +183,8 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
                 {availableTransferModes.map((mode) => (
                   <div key={mode} className="flex items-center space-x-2">
                     <RadioGroupItem value={mode} id={mode} />
-                    <Label htmlFor={mode} className="capitalize">
-                      {mode.replace("-", " ")}
+                    <Label htmlFor={mode}>
+                      {getTransferModeLabel(mode)}
                     </Label>
                   </div>
                 ))}
