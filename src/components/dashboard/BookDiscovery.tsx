@@ -114,17 +114,25 @@ export const BookDiscovery = () => {
         query = query.eq("price_range", selectedPriceRange);
       }
 
-      // Geolocation filter: we'll fetch all, then filter in JS (for now)
-      const { data, error } = await query.order("created_at", { ascending: false });
+      // Fix: Explicitly annotate data type from Supabase
+      const { data, error } = await query.order("created_at", { ascending: false }) as {
+        data: Book[] | null;
+        error: any;
+      };
 
       if (error) throw error;
 
-      let filteredBooks = data || [];
+      let filteredBooks: Book[] = data || [];
       // Filter by radius (if user location is available)
       if (userCoords && selectedRadius) {
-        filteredBooks = filteredBooks.filter((book: Book) => {
+        filteredBooks = filteredBooks.filter((book) => {
           if (book.latitude && book.longitude) {
-            const dist = haversineDistance(userCoords.lat, userCoords.lng, book.latitude, book.longitude);
+            const dist = haversineDistance(
+              userCoords.lat,
+              userCoords.lng,
+              book.latitude,
+              book.longitude
+            );
             return dist <= Number(selectedRadius);
           }
           return false;
@@ -140,10 +148,12 @@ export const BookDiscovery = () => {
         selectedISBN && `ISBN: ${selectedISBN}`,
         selectedCondition && `Condition: ${selectedCondition}`,
         selectedPriceRange && `Price: ₹${selectedPriceRange}`,
-        userCoords && selectedRadius && `Within ${selectedRadius}km`
-      ].filter(Boolean).join(" | ");
+        userCoords && selectedRadius && `Within ${selectedRadius}km`,
+      ]
+        .filter(Boolean)
+        .join(" | ");
       if (filterSummary) {
-        setSearchHistory((prev) => [filterSummary, ...prev.filter(h => h !== filterSummary)].slice(0, 7));
+        setSearchHistory((prev) => [filterSummary, ...prev.filter((h) => h !== filterSummary)].slice(0, 7));
       }
     } catch (error: any) {
       toast({
