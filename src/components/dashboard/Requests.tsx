@@ -110,7 +110,7 @@ export const Requests = () => {
         schema: 'public',
         table: 'purchase_requests'
       }, (payload) => {
-        playNotificationSound();
+        playNotificationSound(); // Play sound on any request update (book/delivery)
         fetchRequests();
       })
       .on('postgres_changes', {
@@ -125,7 +125,7 @@ export const Requests = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [playNotificationSound]);
 
   const updateRequestStatus = async (requestId: string, status: string) => {
     try {

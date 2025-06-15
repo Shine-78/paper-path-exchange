@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Send } from "lucide-react";
+import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 interface ChatMessage {
   id: string;
@@ -32,6 +33,7 @@ export const ChatModal = ({ isOpen, onClose, requestId, currentUserId }: ChatMod
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { playNotificationSound } = useNotificationSound();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -97,15 +99,7 @@ export const ChatModal = ({ isOpen, onClose, requestId, currentUserId }: ChatMod
         supabase.removeChannel(channel);
       };
     }
-  }, [isOpen, requestId]);
-
-  const playNotificationSound = () => {
-    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmocDUCLze7GbDAGKm3A7siJNgMi');
-    audio.volume = 0.3;
-    audio.play().catch(() => {
-      // Ignore if audio can't play
-    });
-  };
+  }, [isOpen, requestId, playNotificationSound, currentUserId]);
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
