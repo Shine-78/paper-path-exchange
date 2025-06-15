@@ -1,12 +1,11 @@
 
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { BookCard } from "./BookCard";
-import { Search, MapPin, Filter, BookOpen } from "lucide-react";
+import { Search, MapPin, Filter, BookOpen, Sparkles, Grid3X3, List } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -39,7 +38,6 @@ const priceRanges = [20, 35, 50];
 const conditions = ["excellent", "good", "fair", "poor"];
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  // Returns distance in kilometers between two lat/lng
   const toRad = (x: number) => x * Math.PI / 180;
   const R = 6371;
   const dLat = toRad(lat2 - lat1);
@@ -52,7 +50,6 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 export const BookDiscovery = () => {
-  // Add new states for advanced filters & history
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -61,10 +58,12 @@ export const BookDiscovery = () => {
   const [selectedISBN, setSelectedISBN] = useState<string>("");
   const [selectedCondition, setSelectedCondition] = useState<string>("");
   const [selectedPriceRange, setSelectedPriceRange] = useState<number | "">("");
-  const [selectedRadius, setSelectedRadius] = useState<number | "">(10); // radius in km
+  const [selectedRadius, setSelectedRadius] = useState<number | "">(10);
   const [userCoords, setUserCoords] = useState<{lat: number; lng: number} | null>(null);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [savedSearches, setSavedSearches] = useState<{label: string, filters: any}[]>([]);
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const { toast } = useToast();
 
   // Geolocation
@@ -84,7 +83,6 @@ export const BookDiscovery = () => {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      // Build filters object
       const filters: Record<string, any> = {
         status: "available"
       };
@@ -95,10 +93,8 @@ export const BookDiscovery = () => {
       if (selectedCondition) filters.condition = selectedCondition;
       if (selectedPriceRange) filters.price_range = selectedPriceRange;
 
-      // Use match() instead of chaining eq() calls to avoid type inference issues
       let query = supabase.from("books").select("*").match(filters);
 
-      // Handle search term separately with text search
       if (searchTerm) {
         query = query.or(`title.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
       }
@@ -107,7 +103,6 @@ export const BookDiscovery = () => {
 
       if (booksError) throw booksError;
 
-      // Fetch profiles separately to avoid complex type inference
       const sellerIds = booksData?.map(book => book.seller_id).filter(Boolean) || [];
       let profilesData: any[] = [];
       
@@ -122,13 +117,11 @@ export const BookDiscovery = () => {
         }
       }
 
-      // Combine books with profiles manually
       const booksWithProfiles: Book[] = (booksData || []).map(book => ({
         ...book,
         profiles: profilesData.find(profile => profile.id === book.seller_id)
       }));
 
-      // Filter by radius (if user location is available)
       let filteredBooks = booksWithProfiles;
       if (userCoords && selectedRadius) {
         filteredBooks = booksWithProfiles.filter((book) => {
@@ -147,7 +140,6 @@ export const BookDiscovery = () => {
       
       setBooks(filteredBooks);
 
-      // Save to search history
       const filterSummary = [
         searchTerm && `Search: "${searchTerm}"`,
         selectedGenre && `Genre: ${selectedGenre}`,
@@ -178,7 +170,6 @@ export const BookDiscovery = () => {
     // eslint-disable-next-line
   }, [searchTerm, selectedGenre, selectedYear, selectedISBN, selectedCondition, selectedPriceRange, selectedRadius, userCoords]);
 
-  // "Save search" logic (client only for now)
   const handleSaveSearch = () => {
     const label = [
       searchTerm && `${searchTerm}`,
@@ -207,7 +198,6 @@ export const BookDiscovery = () => {
     });
   };
 
-  // Restore saved search
   const handleLoadSearch = (filters: any) => {
     setSearchTerm(filters.searchTerm || "");
     setSelectedGenre(filters.selectedGenre || "");
@@ -220,68 +210,89 @@ export const BookDiscovery = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex justify-center items-center">
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+            <div className="absolute inset-0 rounded-full animate-ping h-16 w-16 border-4 border-blue-300 opacity-20 mx-auto"></div>
+          </div>
+          <p className="text-gray-600 animate-pulse">Discovering amazing books...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Search and Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="h-5 w-5" />
-            <span>Discover Books</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-6">
-            <div className="md:col-span-2">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 text-white">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="30" cy="30" r="2"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] animate-pulse"></div>
+        <div className="relative px-6 py-16 text-center">
+          <div className="animate-fade-in">
+            <Sparkles className="h-12 w-12 mx-auto mb-4 animate-bounce" />
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+              Discover Amazing Books
+            </h1>
+            <p className="text-xl text-blue-100 max-w-2xl mx-auto leading-relaxed">
+              Find your next favorite read from thousands of books shared by our community
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* Search and Filters */}
+        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm hover:shadow-3xl transition-all duration-500 animate-slide-in-right">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center space-x-3 text-2xl">
+                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
+                  <Search className="h-6 w-6 text-white" />
+                </div>
+                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Search & Filter
+                </span>
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
+                className="hover:scale-105 transition-transform duration-200"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                {isFiltersExpanded ? 'Simple' : 'Advanced'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Main Search */}
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200" />
               <Input
-                placeholder="Search by title or author..."
+                placeholder="Search by title, author, or keyword..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
+                className="pl-12 h-14 text-lg border-2 border-gray-200 focus:border-blue-500 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
               />
             </div>
-            <div>
+
+            {/* Quick Filters */}
+            <div className="grid gap-4 md:grid-cols-3">
               <select
                 value={selectedGenre}
                 onChange={(e) => setSelectedGenre(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md"
+                className="h-12 px-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 transition-all duration-200 hover:shadow-md"
               >
                 <option value="">All Genres</option>
                 {genres.map((genre) => (
                   <option key={genre} value={genre}>{genre}</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <Input
-                type="number"
-                placeholder="Year"
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full"
-                min={1800}
-                max={new Date().getFullYear()}
-              />
-            </div>
-            <div>
-              <Input
-                placeholder="ISBN"
-                value={selectedISBN}
-                onChange={(e) => setSelectedISBN(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div>
               <select
                 value={selectedCondition}
                 onChange={(e) => setSelectedCondition(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md"
+                className="h-12 px-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 transition-all duration-200 hover:shadow-md"
               >
                 <option value="">All Conditions</option>
                 {conditions.map((condition) => (
@@ -290,120 +301,197 @@ export const BookDiscovery = () => {
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
               <select
                 value={selectedPriceRange}
                 onChange={(e) => setSelectedPriceRange(e.target.value ? Number(e.target.value) : "")}
-                className="w-full p-2 border border-gray-300 rounded-md"
+                className="h-12 px-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 transition-all duration-200 hover:shadow-md"
               >
                 <option value="">All Prices</option>
                 {priceRanges.map((price) => (
-                  <option key={price} value={price}>
-                    ₹{price}
-                  </option>
+                  <option key={price} value={price}>Up to ₹{price}</option>
                 ))}
               </select>
             </div>
-          </div>
-          {/* Geolocation-based filter */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-            <div className="flex items-center space-x-2 col-span-2">
-              <MapPin className="h-4 w-4 text-gray-500" />
-              <span>Within</span>
-              <select
-                className="p-1 border rounded"
-                value={selectedRadius}
-                onChange={e => setSelectedRadius(Number(e.target.value))}
-              >
-                <option value={3}>3 km</option>
-                <option value={5}>5 km</option>
-                <option value={10}>10 km</option>
-                <option value={25}>25 km</option>
-                <option value={50}>50 km</option>
-                <option value={100}>100 km</option>
-                <option value={9999}>Any distance</option>
-              </select>
-              <span>of me</span>
-              {!userCoords && (
-                <span className="ml-2 text-xs text-gray-400">Enable location for more relevant results</span>
-              )}
-            </div>
-            <Button type="button" onClick={fetchBooks} className="col-span-1">
-              <Filter className="h-4 w-4 mr-1" />
-              Apply Filters
-            </Button>
-            <Button type="button" variant="outline" onClick={handleSaveSearch} className="col-span-1">
-              Save Search
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      {/* Saved Searches */}
-      {savedSearches.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center">
-              <BookmarkIcon className="w-5 h-5 mr-2" />
-              Saved Searches
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {savedSearches.map((s, i) => (
-                <Badge key={i} className="cursor-pointer" onClick={() => handleLoadSearch(s.filters)}>
-                  {s.label}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      {/* Search History */}
-      {searchHistory.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center">
-              <Search className="w-4 h-4 mr-2" />
-              Search History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="text-xs text-gray-600 list-decimal list-inside space-y-1">
-              {searchHistory.map((item, i) => (
-                <li key={i}>{item}</li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Results */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-gray-600">{books.length} books found</p>
-          <Button
-            variant="outline"
-            onClick={fetchBooks}
-            className="flex items-center space-x-2"
-          >
-            <Filter className="h-4 w-4" />
-            <span>Refresh</span>
-          </Button>
+            {/* Advanced Filters */}
+            <div className={`space-y-4 transition-all duration-500 overflow-hidden ${isFiltersExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  type="number"
+                  placeholder="Publication Year"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="h-12 border-2 border-gray-200 rounded-xl focus:border-blue-500 transition-all duration-200"
+                  min={1800}
+                  max={new Date().getFullYear()}
+                />
+                <Input
+                  placeholder="ISBN"
+                  value={selectedISBN}
+                  onChange={(e) => setSelectedISBN(e.target.value)}
+                  className="h-12 border-2 border-gray-200 rounded-xl focus:border-blue-500 transition-all duration-200"
+                />
+              </div>
+
+              {/* Location Filter */}
+              <div className="flex items-center space-x-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
+                <MapPin className="h-5 w-5 text-blue-500" />
+                <span className="font-medium text-gray-700">Within</span>
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 transition-colors duration-200"
+                  value={selectedRadius}
+                  onChange={e => setSelectedRadius(Number(e.target.value))}
+                >
+                  <option value={3}>3 km</option>
+                  <option value={5}>5 km</option>
+                  <option value={10}>10 km</option>
+                  <option value={25}>25 km</option>
+                  <option value={50}>50 km</option>
+                  <option value={100}>100 km</option>
+                  <option value={9999}>Any distance</option>
+                </select>
+                <span className="font-medium text-gray-700">of me</span>
+                {!userCoords && (
+                  <span className="text-xs text-gray-500 bg-yellow-100 px-2 py-1 rounded-full">
+                    📍 Enable location for better results
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <Button 
+                onClick={fetchBooks} 
+                className="flex-1 h-12 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <Search className="h-5 w-5 mr-2" />
+                Search Books
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleSaveSearch}
+                className="h-12 px-6 rounded-xl border-2 hover:bg-blue-50 transition-all duration-300 transform hover:scale-105"
+              >
+                Save Search
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Saved Searches */}
+        {savedSearches.length > 0 && (
+          <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm animate-fade-in">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center">
+                <BookmarkIcon className="w-5 h-5 mr-2 text-purple-500" />
+                <span className="text-purple-700">Saved Searches</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {savedSearches.map((s, i) => (
+                  <Badge 
+                    key={i} 
+                    className="cursor-pointer bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 hover:from-purple-200 hover:to-blue-200 transition-all duration-300 transform hover:scale-105 px-3 py-2 text-sm" 
+                    onClick={() => handleLoadSearch(s.filters)}
+                  >
+                    {s.label}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Search History */}
+        {searchHistory.length > 0 && (
+          <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm animate-fade-in">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center">
+                <Search className="w-4 h-4 mr-2 text-blue-500" />
+                <span className="text-blue-700">Recent Searches</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {searchHistory.slice(0, 3).map((item, i) => (
+                  <div key={i} className="text-sm text-gray-600 p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Results Header */}
+        <div className="flex items-center justify-between bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg">
+          <div className="flex items-center space-x-4">
+            <div className="p-2 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl">
+              <BookOpen className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">
+                {books.length} Books Found
+              </h2>
+              <p className="text-gray-600">Discover your next favorite read</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('grid')}
+              className="transition-all duration-200"
+            >
+              <Grid3X3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="transition-all duration-200"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
+        {/* Results */}
         {books.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No books found</h3>
-              <p className="text-gray-600">Try adjusting your search criteria or check back later.</p>
+          <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+            <CardContent className="text-center py-16">
+              <div className="animate-bounce mb-6">
+                <BookOpen className="h-20 w-20 text-gray-300 mx-auto" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">No books found</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Try adjusting your search criteria or explore different genres to find amazing books.
+              </p>
+              <Button 
+                onClick={fetchBooks}
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <Search className="h-5 w-5 mr-2" />
+                Search Again
+              </Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {books.map((book) => (
-              <BookCard key={book.id} book={book} />
+          <div className={`transition-all duration-500 ${
+            viewMode === 'grid' 
+              ? 'grid gap-8 md:grid-cols-2 lg:grid-cols-3' 
+              : 'space-y-6'
+          }`}>
+            {books.map((book, index) => (
+              <div
+                key={book.id}
+                className="animate-fade-in transform transition-all duration-500 hover:scale-105"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <BookCard book={book} />
+              </div>
             ))}
           </div>
         )}
@@ -419,4 +507,3 @@ function BookmarkIcon(props: any) {
     </svg>
   );
 }
-
