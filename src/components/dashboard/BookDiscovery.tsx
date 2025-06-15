@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -83,27 +84,21 @@ export const BookDiscovery = () => {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      // Start with base query - avoid complex type inference
-      let query = supabase.from("books").select("*").eq("status", "available");
+      // Build filters object
+      const filters: Record<string, any> = {
+        status: "available"
+      };
 
-      // Apply filters directly without dynamic iteration
-      if (selectedGenre) {
-        query = query.eq("genre", selectedGenre);
-      }
-      if (selectedYear) {
-        query = query.eq("publication_year", Number(selectedYear));
-      }
-      if (selectedISBN) {
-        query = query.eq("isbn", selectedISBN);
-      }
-      if (selectedCondition) {
-        query = query.eq("condition", selectedCondition);
-      }
-      if (selectedPriceRange) {
-        query = query.eq("price_range", selectedPriceRange);
-      }
+      if (selectedGenre) filters.genre = selectedGenre;
+      if (selectedYear) filters.publication_year = Number(selectedYear);
+      if (selectedISBN) filters.isbn = selectedISBN;
+      if (selectedCondition) filters.condition = selectedCondition;
+      if (selectedPriceRange) filters.price_range = selectedPriceRange;
 
-      // Handle search term separately
+      // Use match() instead of chaining eq() calls to avoid type inference issues
+      let query = supabase.from("books").select("*").match(filters);
+
+      // Handle search term separately with text search
       if (searchTerm) {
         query = query.or(`title.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
       }
@@ -424,3 +419,4 @@ function BookmarkIcon(props: any) {
     </svg>
   );
 }
+
