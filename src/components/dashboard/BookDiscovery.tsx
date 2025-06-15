@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,11 +12,16 @@ interface Book {
   id: string;
   title: string;
   author: string;
+  genre?: string;
+  publication_year?: number;
+  isbn?: string;
   condition: string;
   price_range: number;
   transfer_type: string;
   description?: string;
   location_address?: string;
+  latitude?: number;
+  longitude?: number;
   images: string[];
   seller_id: string;
   profiles?: {
@@ -28,15 +32,55 @@ interface Book {
   };
 }
 
+const genres = ["Fiction", "Non-Fiction", "Textbook", "Comics", "Children", "Self-Help", "Fantasy", "Science"];
+const priceRanges = [20, 35, 50];
+const conditions = ["excellent", "good", "fair", "poor"];
+
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  // Returns distance in kilometers between two lat/lng
+  const toRad = (x: number) => x * Math.PI / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 export const BookDiscovery = () => {
+  // Add new states for advanced filters & history
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState<string>("");
+  const [selectedYear, setSelectedYear] = useState<string | "">("");
+  const [selectedISBN, setSelectedISBN] = useState<string>("");
   const [selectedCondition, setSelectedCondition] = useState<string>("");
   const [selectedPriceRange, setSelectedPriceRange] = useState<number | "">("");
+  const [selectedRadius, setSelectedRadius] = useState<number | "">(10); // radius in km
+  const [userCoords, setUserCoords] = useState<{lat: number; lng: number} | null>(null);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [savedSearches, setSavedSearches] = useState<{label: string, filters: any}[]>([]);
   const { toast } = useToast();
 
+  // Geolocation
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        },
+        () => {},
+        { enableHighAccuracy: false }
+      );
+    }
+  }, []);
+
+  // Fetch books with advanced filters
   const fetchBooks = async () => {
+    setLoading(true);
     try {
       let query = supabase
         .from("books")
@@ -54,19 +98,53 @@ export const BookDiscovery = () => {
       if (searchTerm) {
         query = query.or(`title.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%`);
       }
-
+      if (selectedGenre) {
+        query = query.eq("genre", selectedGenre);
+      }
+      if (selectedYear) {
+        query = query.eq("publication_year", Number(selectedYear));
+      }
+      if (selectedISBN) {
+        query = query.eq("isbn", selectedISBN);
+      }
       if (selectedCondition) {
         query = query.eq("condition", selectedCondition);
       }
-
       if (selectedPriceRange) {
         query = query.eq("price_range", selectedPriceRange);
       }
 
+      // Geolocation filter: we'll fetch all, then filter in JS (for now)
       const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
-      setBooks(data || []);
+
+      let filteredBooks = data || [];
+      // Filter by radius (if user location is available)
+      if (userCoords && selectedRadius) {
+        filteredBooks = filteredBooks.filter((book: Book) => {
+          if (book.latitude && book.longitude) {
+            const dist = haversineDistance(userCoords.lat, userCoords.lng, book.latitude, book.longitude);
+            return dist <= Number(selectedRadius);
+          }
+          return false;
+        });
+      }
+      setBooks(filteredBooks);
+
+      // Save to search history
+      const filterSummary = [
+        searchTerm && `Search: "${searchTerm}"`,
+        selectedGenre && `Genre: ${selectedGenre}`,
+        selectedYear && `Year: ${selectedYear}`,
+        selectedISBN && `ISBN: ${selectedISBN}`,
+        selectedCondition && `Condition: ${selectedCondition}`,
+        selectedPriceRange && `Price: ₹${selectedPriceRange}`,
+        userCoords && selectedRadius && `Within ${selectedRadius}km`
+      ].filter(Boolean).join(" | ");
+      if (filterSummary) {
+        setSearchHistory((prev) => [filterSummary, ...prev.filter(h => h !== filterSummary)].slice(0, 7));
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -80,10 +158,48 @@ export const BookDiscovery = () => {
 
   useEffect(() => {
     fetchBooks();
-  }, [searchTerm, selectedCondition, selectedPriceRange]);
+    // eslint-disable-next-line
+  }, [searchTerm, selectedGenre, selectedYear, selectedISBN, selectedCondition, selectedPriceRange, selectedRadius, userCoords]);
 
-  const conditions = ["excellent", "good", "fair", "poor"];
-  const priceRanges = [20, 35, 50];
+  // "Save search" logic (client only for now)
+  const handleSaveSearch = () => {
+    const label = [
+      searchTerm && `${searchTerm}`,
+      selectedGenre && selectedGenre,
+      selectedYear && selectedYear,
+      selectedISBN && selectedISBN,
+      selectedCondition && selectedCondition,
+      selectedPriceRange && `₹${selectedPriceRange}`,
+      userCoords && selectedRadius && `📍${selectedRadius}km`
+    ].filter(Boolean).join(", ");
+    setSavedSearches((prev) => [...prev, {
+      label: label || `Custom Search ${savedSearches.length+1}`,
+      filters: {
+        searchTerm,
+        selectedGenre,
+        selectedYear,
+        selectedISBN,
+        selectedCondition,
+        selectedPriceRange,
+        selectedRadius
+      }
+    }]);
+    toast({
+      title: "Search Saved!",
+      description: "Click on a saved search to quickly apply those filters.",
+    });
+  };
+
+  // Restore saved search
+  const handleLoadSearch = (filters: any) => {
+    setSearchTerm(filters.searchTerm || "");
+    setSelectedGenre(filters.selectedGenre || "");
+    setSelectedYear(filters.selectedYear || "");
+    setSelectedISBN(filters.selectedISBN || "");
+    setSelectedCondition(filters.selectedCondition || "");
+    setSelectedPriceRange(filters.selectedPriceRange || "");
+    setSelectedRadius(filters.selectedRadius || 10);
+  };
 
   if (loading) {
     return (
@@ -104,12 +220,43 @@ export const BookDiscovery = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-6">
             <div className="md:col-span-2">
               <Input
                 placeholder="Search by title or author..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <select
+                value={selectedGenre}
+                onChange={(e) => setSelectedGenre(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                <option value="">All Genres</option>
+                {genres.map((genre) => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Input
+                type="number"
+                placeholder="Year"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full"
+                min={1800}
+                max={new Date().getFullYear()}
+              />
+            </div>
+            <div>
+              <Input
+                placeholder="ISBN"
+                value={selectedISBN}
+                onChange={(e) => setSelectedISBN(e.target.value)}
                 className="w-full"
               />
             </div>
@@ -142,8 +289,77 @@ export const BookDiscovery = () => {
               </select>
             </div>
           </div>
+          {/* Geolocation-based filter */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+            <div className="flex items-center space-x-2 col-span-2">
+              <MapPin className="h-4 w-4 text-gray-500" />
+              <span>Within</span>
+              <select
+                className="p-1 border rounded"
+                value={selectedRadius}
+                onChange={e => setSelectedRadius(Number(e.target.value))}
+              >
+                <option value={3}>3 km</option>
+                <option value={5}>5 km</option>
+                <option value={10}>10 km</option>
+                <option value={25}>25 km</option>
+                <option value={50}>50 km</option>
+                <option value={100}>100 km</option>
+                <option value={9999}>Any distance</option>
+              </select>
+              <span>of me</span>
+              {!userCoords && (
+                <span className="ml-2 text-xs text-gray-400">Enable location for more relevant results</span>
+              )}
+            </div>
+            <Button type="button" onClick={fetchBooks} className="col-span-1">
+              <Filter className="h-4 w-4 mr-1" />
+              Apply Filters
+            </Button>
+            <Button type="button" variant="outline" onClick={handleSaveSearch} className="col-span-1">
+              Save Search
+            </Button>
+          </div>
         </CardContent>
       </Card>
+      {/* Saved Searches */}
+      {savedSearches.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center">
+              <BookmarkIcon className="w-5 h-5 mr-2" />
+              Saved Searches
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {savedSearches.map((s, i) => (
+                <Badge key={i} className="cursor-pointer" onClick={() => handleLoadSearch(s.filters)}>
+                  {s.label}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {/* Search History */}
+      {searchHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center">
+              <Search className="w-4 h-4 mr-2" />
+              Search History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ol className="text-xs text-gray-600 list-decimal list-inside space-y-1">
+              {searchHistory.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Results */}
       <div>
@@ -178,3 +394,11 @@ export const BookDiscovery = () => {
     </div>
   );
 };
+
+function BookmarkIcon(props: any) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      <path d="M17 3a2 2 0 0 1 2 2v16l-7-5-7 5V5a2 2 0 0 1 2-2h10Z" stroke="currentColor" strokeWidth={2} />
+    </svg>
+  );
+}
