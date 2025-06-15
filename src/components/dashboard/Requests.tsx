@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import { CheckCircle, Circle, User, Book, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BookRouteMap } from "./BookRouteMap";
+import { LeafletBookRouteMap } from "./LeafletBookRouteMap";
 
 interface PurchaseRequest {
   id: string;
@@ -142,9 +142,6 @@ export const Requests = (props) => {
   } | null>(null);
   const [showMap, setShowMap] = useState(false);
 
-  // Replace <MAPBOX_PUBLIC_TOKEN_HERE> with your public Mapbox token or pull from env/secret if you have.
-  const mapboxToken = "<MAPBOX_PUBLIC_TOKEN_HERE>";
-
   return (
     <div>
       <Card>
@@ -223,10 +220,9 @@ export const Requests = (props) => {
             >
               ×
             </button>
-            <BookRouteMap
+            <LeafletBookRouteMap
               buyer={mapViewData.buyer}
               seller={mapViewData.seller}
-              mapboxToken={mapboxToken}
             />
           </div>
         </div>
