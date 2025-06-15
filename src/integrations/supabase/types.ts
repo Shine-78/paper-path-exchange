@@ -200,9 +200,11 @@ export type Database = {
       }
       notifications: {
         Row: {
+          action_url: string | null
           created_at: string | null
           id: string
           message: string
+          priority: string | null
           read: boolean | null
           related_id: string | null
           title: string
@@ -210,9 +212,11 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          action_url?: string | null
           created_at?: string | null
           id?: string
           message: string
+          priority?: string | null
           read?: boolean | null
           related_id?: string | null
           title: string
@@ -220,9 +224,11 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          action_url?: string | null
           created_at?: string | null
           id?: string
           message?: string
+          priority?: string | null
           read?: boolean | null
           related_id?: string | null
           title?: string

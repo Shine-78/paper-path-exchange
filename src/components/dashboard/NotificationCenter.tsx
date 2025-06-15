@@ -58,9 +58,9 @@ export const NotificationCenter = () => {
         message: notification.message,
         read: notification.read || false,
         priority: notification.priority || 'normal',
-        action_url: notification.action_url,
+        action_url: notification.action_url || undefined,
         created_at: notification.created_at || '',
-        related_id: notification.related_id
+        related_id: notification.related_id || undefined
       }));
       
       setNotifications(mappedNotifications);
