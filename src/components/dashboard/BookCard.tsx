@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,8 +39,14 @@ export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
   // Get current user properly
   useEffect(() => {
     const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id || null);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('Current user in BookCard:', user?.id);
+        setCurrentUserId(user?.id || null);
+      } catch (error) {
+        console.error('Error getting current user:', error);
+        setCurrentUserId(null);
+      }
     };
     
     getCurrentUser();
@@ -56,6 +63,17 @@ export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
   };
 
   const canRequestBook = currentUserId && currentUserId !== book.seller_id;
+
+  const handleRequestClick = () => {
+    console.log('Request button clicked for book:', book.id);
+    console.log('Current user can request:', canRequestBook);
+    console.log('Book seller ID:', book.seller_id);
+    console.log('Current user ID:', currentUserId);
+    
+    if (canRequestBook) {
+      setIsRequestModalOpen(true);
+    }
+  };
 
   return (
     <>
@@ -133,7 +151,7 @@ export const BookCard = ({ book, onRequestPurchase }: BookCardProps) => {
 
           {canRequestBook ? (
             <Button 
-              onClick={() => setIsRequestModalOpen(true)} 
+              onClick={handleRequestClick} 
               className="w-full h-12 text-lg font-semibold bg-blue-600 hover:bg-blue-700 touch-manipulation"
             >
               Request to Buy

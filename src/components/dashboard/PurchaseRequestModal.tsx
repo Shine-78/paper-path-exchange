@@ -43,7 +43,7 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase.from("purchase_requests").insert({
+      console.log('Submitting purchase request with data:', {
         book_id: book.id,
         buyer_id: user.id,
         seller_id: book.seller_id,
@@ -52,7 +52,32 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
         message: message || null,
       });
 
-      if (error) throw error;
+      const { data, error } = await supabase.from("purchase_requests").insert({
+        book_id: book.id,
+        buyer_id: user.id,
+        seller_id: book.seller_id,
+        offered_price: offeredPrice,
+        transfer_mode: transferMode,
+        message: message || null,
+        status: 'pending'
+      }).select().single();
+
+      if (error) {
+        console.error('Purchase request error:', error);
+        throw error;
+      }
+
+      console.log('Purchase request created successfully:', data);
+
+      // Create notification for seller
+      await supabase.from("notifications").insert({
+        user_id: book.seller_id,
+        type: 'purchase_request',
+        title: 'New Purchase Request',
+        message: `Someone wants to buy your book "${book.title}" for ₹${offeredPrice}`,
+        related_id: book.id,
+        priority: 'normal'
+      });
 
       toast({
         title: "Request sent!",
@@ -61,9 +86,10 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
 
       onClose();
     } catch (error: any) {
+      console.error('Error sending purchase request:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to send purchase request",
         variant: "destructive",
       });
     } finally {
