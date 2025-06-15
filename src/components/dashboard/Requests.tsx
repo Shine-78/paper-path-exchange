@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCaption,
@@ -135,13 +142,6 @@ export const Requests = (props) => {
     }
   };
 
-  // Add map modal state for showing the location map
-  const [mapViewData, setMapViewData] = useState<{
-    buyer: { latitude: number; longitude: number } | null;
-    seller: { latitude: number; longitude: number } | null;
-  } | null>(null);
-  const [showMap, setShowMap] = useState(false);
-
   return (
     <div>
       <Card>
@@ -171,6 +171,9 @@ export const Requests = (props) => {
                     const seller = request.seller_latitude && request.seller_longitude
                       ? { latitude: Number(request.seller_latitude), longitude: Number(request.seller_longitude) }
                       : null;
+                    
+                    const canShowMap = buyer && seller;
+                    
                     return (
                       <TableRow key={request.id}>
                         <TableCell className="font-medium">{request.book_title}</TableCell>
@@ -183,22 +186,40 @@ export const Requests = (props) => {
                           {request.status === 'completed' && <Badge className="bg-blue-100 text-blue-800 border-0">Completed</Badge>}
                         </TableCell>
                         <TableCell className="text-right">
-                          {request.status === 'pending' && (
-                            <div className="space-x-2">
-                              <Button size="sm" onClick={() => handleAcceptRequest(request.id)}>Accept</Button>
-                              <Button variant="outline" size="sm" onClick={() => handleRejectRequest(request.id)}>Reject</Button>
-                            </div>
-                          )}
-                          <button
-                            className="mt-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-                            onClick={() => {
-                              setMapViewData({ buyer, seller });
-                              setShowMap(true);
-                            }}
-                            disabled={!buyer || !seller}
-                          >
-                            View Buyer/Seller Map
-                          </button>
+                          <div className="flex flex-col gap-2">
+                            {request.status === 'pending' && (
+                              <div className="space-x-2">
+                                <Button size="sm" onClick={() => handleAcceptRequest(request.id)}>Accept</Button>
+                                <Button variant="outline" size="sm" onClick={() => handleRejectRequest(request.id)}>Reject</Button>
+                              </div>
+                            )}
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={!canShowMap}
+                                  className="bg-purple-600 text-white hover:bg-purple-700"
+                                >
+                                  <MapPin className="w-4 h-4 mr-2" />
+                                  View Map
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>Buyer & Seller Locations</DialogTitle>
+                                </DialogHeader>
+                                {canShowMap && (
+                                  <div className="mt-4">
+                                    <LeafletBookRouteMap
+                                      buyer={buyer}
+                                      seller={seller}
+                                    />
+                                  </div>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -209,24 +230,6 @@ export const Requests = (props) => {
           )}
         </CardContent>
       </Card>
-
-      {/* Modal overlay for map */}
-      {showMap && mapViewData && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full p-4 relative">
-            <button
-              className="absolute top-2 right-2 rounded-full bg-gray-200 p-2 hover:bg-gray-300"
-              onClick={() => setShowMap(false)}
-            >
-              ×
-            </button>
-            <LeafletBookRouteMap
-              buyer={mapViewData.buyer}
-              seller={mapViewData.seller}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
