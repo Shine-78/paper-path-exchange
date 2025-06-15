@@ -44,19 +44,48 @@ serve(async (req) => {
       throw new Error('Purchase request not found');
     }
 
-    // Create delivery confirmation record
-    const { error: insertError } = await supabaseService
+    // Upsert-like logic for delivery confirmation record
+    const { data: existingConfirmation, error: selectError } = await supabaseService
       .from('delivery_confirmations')
-      .insert({
-        purchase_request_id: purchaseRequestId,
-        buyer_id: request.buyer_id,
-        seller_id: request.seller_id,
-        otp_code: otpCode
-      });
+      .select('id')
+      .eq('purchase_request_id', purchaseRequestId)
+      .maybeSingle();
 
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      throw insertError;
+    if (selectError) {
+      console.error('Select existing confirmation error:', selectError);
+      throw selectError;
+    }
+
+    if (existingConfirmation) {
+      // Update existing record
+      const { error: updateError } = await supabaseService
+        .from('delivery_confirmations')
+        .update({
+          otp_code: otpCode,
+          otp_sent_at: new Date().toISOString(),
+          otp_verified_at: null
+        })
+        .eq('id', existingConfirmation.id);
+      
+      if (updateError) {
+        console.error('Update confirmation error:', updateError);
+        throw updateError;
+      }
+    } else {
+      // Create new delivery confirmation record
+      const { error: insertError } = await supabaseService
+        .from('delivery_confirmations')
+        .insert({
+          purchase_request_id: purchaseRequestId,
+          buyer_id: request.buyer_id,
+          seller_id: request.seller_id,
+          otp_code: otpCode
+        });
+
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw insertError;
+      }
     }
 
     // Send OTP via email using Resend
@@ -70,7 +99,7 @@ serve(async (req) => {
           <p>Hello ${request.buyer.full_name || 'there'},</p>
           <p>Your one-time password (OTP) to confirm the delivery of "<strong>${request.books.title}</strong>" is:</p>
           <h2 style="font-size: 24px; letter-spacing: 2px; text-align: center; background: #f0f0f0; padding: 10px; border-radius: 5px;">${otpCode}</h2>
-          <p>This code is valid for 30 minutes. Please provide it to the seller to complete the delivery process.</p>
+          <p>This code is valid for 10 minutes. Please provide it to the seller to complete the delivery process.</p>
           <p>If you did not request this, please ignore this email.</p>
           <br/>
           <p>Thanks,</p>
@@ -94,7 +123,7 @@ serve(async (req) => {
         user_id: request.buyer_id,
         type: 'delivery_otp',
         title: 'Delivery OTP Code',
-        message: `Your delivery OTP for "${request.books.title}" is: ${otpCode}. Please confirm delivery to proceed with payment. Valid for 30 minutes.`,
+        message: `Your delivery OTP for "${request.books.title}" is: ${otpCode}. Please confirm delivery to proceed with payment. Valid for 10 minutes.`,
         related_id: purchaseRequestId,
         priority: 'high'
       });
@@ -117,4 +146,3 @@ serve(async (req) => {
     });
   }
 });
-

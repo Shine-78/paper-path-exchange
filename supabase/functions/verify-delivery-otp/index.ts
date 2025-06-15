@@ -34,9 +34,9 @@ serve(async (req) => {
       throw new Error('Invalid or expired OTP');
     }
 
-    // Check if OTP is not older than 30 minutes
+    // Check if OTP is not older than 10 minutes
     const otpAge = Date.now() - new Date(confirmation.otp_sent_at).getTime();
-    if (otpAge > 30 * 60 * 1000) {
+    if (otpAge > 10 * 60 * 1000) {
       throw new Error('OTP has expired');
     }
 

@@ -253,6 +253,15 @@ export const DeliveryConfirmationModal = ({
                             Verify
                           </Button>
                         </div>
+                        <Button
+                          size="sm"
+                          variant="link"
+                          onClick={sendOTP}
+                          disabled={sending}
+                          className="p-0 h-auto"
+                        >
+                          {sending ? "Sending..." : "Resend OTP"}
+                        </Button>
                       </div>
                     )}
                   </div>
