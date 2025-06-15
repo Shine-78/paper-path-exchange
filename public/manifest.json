@@ -2,12 +2,57 @@
 {
   "name": "BookEx - Buy & Sell Books",
   "short_name": "BookEx",
-  "description": "A marketplace for buying and selling books with secure payments and delivery confirmation",
+  "description": "A mobile-first marketplace for buying and selling books with secure payments and delivery confirmation",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["shopping", "education", "books"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "/placeholder.svg",
+      "sizes": "1080x1920",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/placeholder.svg",
+      "sizes": "1920x1080", 
+      "type": "image/svg+xml",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Discover Books",
+      "short_name": "Discover",
+      "description": "Browse available books",
+      "url": "/?view=discover",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "64x64"
+        }
+      ]
+    },
+    {
+      "name": "Sell Book",
+      "short_name": "Sell",
+      "description": "List a book for sale",
+      "url": "/?view=sell",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "64x64"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "/favicon.ico",
@@ -18,16 +63,25 @@
       "src": "/placeholder.svg",
       "type": "image/svg+xml",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/placeholder.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "maskable"
     },
     {
       "src": "/placeholder.svg",
       "type": "image/svg+xml",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/placeholder.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
-  ],
-  "categories": ["shopping", "education", "books"],
-  "lang": "en",
-  "dir": "ltr"
+  ]
 }
