@@ -49,13 +49,34 @@ export const AdminDashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
+  // Update: check admin_users table first
   const checkAdminStatus = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
       if (!user) return false;
 
-      // Check if user email is admin@bookex.com or contains 'admin'
-      const isAdminUser = user?.email === 'admin@bookex.com' || user?.email?.includes('admin') || false;
+      // First, check admin_users table for this user's id
+      const { data: adminUsers, error } = await supabase
+        .from("admin_users")
+        .select("user_id")
+        .eq("user_id", user.id);
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Could not access admin status. Please try again.",
+          variant: "destructive",
+        });
+        return false;
+      }
+      if (adminUsers && adminUsers.length > 0) return true;
+
+      // Fallback: allow legacy email-based access
+      const isAdminUser =
+        user.email === "admin@bookex.com" ||
+        user.email === "admin9977@gmail.com" ||
+        user.email?.includes("admin") ||
+        false;
       return isAdminUser;
     } catch {
       return false;
