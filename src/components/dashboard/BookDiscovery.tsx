@@ -227,7 +227,7 @@ export const BookDiscovery = () => {
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 text-white">
         <div className="absolute inset-0 bg-black/20"></div>
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="30" cy="30" r="2"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] animate-pulse"></div>
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23ffffff\" fill-opacity=\"0.1\"%3E%3Ccircle cx=\"30\" cy=\"30\" r=\"2\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] animate-pulse"></div>
         <div className="relative px-6 py-16 text-center">
           <div className="animate-fade-in">
             <Sparkles className="h-12 w-12 mx-auto mb-4 animate-bounce" />
@@ -243,7 +243,7 @@ export const BookDiscovery = () => {
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         {/* Search and Filters */}
-        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm hover:shadow-3xl transition-all duration-500 animate-slide-in-right">
+        <Card className="shadow-2xl border-0 bg-white/80 backdrop-filter backdrop-blur-lg hover:shadow-3xl transition-all duration-500 animate-slide-in-right">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center space-x-3 text-2xl">
@@ -381,7 +381,7 @@ export const BookDiscovery = () => {
 
         {/* Saved Searches */}
         {savedSearches.length > 0 && (
-          <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm animate-fade-in">
+          <Card className="shadow-xl border-0 bg-white/70 backdrop-filter backdrop-blur-sm animate-fade-in">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center">
                 <BookmarkIcon className="w-5 h-5 mr-2 text-purple-500" />
@@ -406,7 +406,7 @@ export const BookDiscovery = () => {
 
         {/* Search History */}
         {searchHistory.length > 0 && (
-          <Card className="shadow-xl border-0 bg-white/70 backdrop-blur-sm animate-fade-in">
+          <Card className="shadow-xl border-0 bg-white/70 backdrop-filter backdrop-blur-sm animate-fade-in">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center">
                 <Search className="w-4 h-4 mr-2 text-blue-500" />
@@ -426,7 +426,7 @@ export const BookDiscovery = () => {
         )}
 
         {/* Results Header */}
-        <div className="flex items-center justify-between bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg">
+        <div className="flex items-center justify-between bg-white/80 backdrop-filter backdrop-blur-sm p-6 rounded-xl shadow-lg">
           <div className="flex items-center space-x-4">
             <div className="p-2 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl">
               <BookOpen className="h-6 w-6 text-white" />
@@ -460,7 +460,7 @@ export const BookDiscovery = () => {
 
         {/* Results */}
         {books.length === 0 ? (
-          <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <Card className="shadow-xl border-0 bg-white/80 backdrop-filter backdrop-blur-sm">
             <CardContent className="text-center py-16">
               <div className="animate-bounce mb-6">
                 <BookOpen className="h-20 w-20 text-gray-300 mx-auto" />
