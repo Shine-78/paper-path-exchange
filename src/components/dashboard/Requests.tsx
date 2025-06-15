@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -5,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Check, X, Clock, Package } from "lucide-react";
+import { MessageSquare, Check, X, Clock, Package, CreditCard, AlertTriangle } from "lucide-react";
 import { ChatModal } from "./ChatModal";
 import { ReviewModal } from "./ReviewModal";
 import { DeliveryConfirmationModal } from "./DeliveryConfirmationModal";
@@ -20,10 +21,13 @@ interface PurchaseRequest {
   created_at: string;
   buyer_id?: string;
   seller_id?: string;
+  book_id?: string;
   books: {
+    id: string;
     title: string;
     author: string;
     price_range: number;
+    listing_paid: boolean;
   };
   buyer_profiles?: {
     full_name: string;
@@ -67,7 +71,7 @@ export const Requests = () => {
         .from("purchase_requests")
         .select(`
           *,
-          books!inner (title, author, price_range),
+          books!inner (id, title, author, price_range, listing_paid),
           seller_profiles:profiles!purchase_requests_seller_id_fkey (full_name)
         `)
         .eq("buyer_id", user.id)
@@ -80,7 +84,7 @@ export const Requests = () => {
         .from("purchase_requests")
         .select(`
           *,
-          books!inner (title, author, price_range),
+          books!inner (id, title, author, price_range, listing_paid),
           buyer_profiles:profiles!purchase_requests_buyer_id_fkey (full_name)
         `)
         .eq("seller_id", user.id)
@@ -129,7 +133,43 @@ export const Requests = () => {
     };
   }, [playNotificationSound]);
 
-  const updateRequestStatus = async (requestId: string, status: string) => {
+  const handlePaySecurityDeposit = async (bookId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-listing-payment', {
+        body: { bookId }
+      });
+
+      if (error) throw error;
+
+      if (data.url) {
+        // Open Stripe checkout in new tab
+        window.open(data.url, '_blank');
+        
+        toast({
+          title: "Redirecting to payment",
+          description: "Complete the security deposit payment to activate your listing.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateRequestStatus = async (requestId: string, status: string, bookListingPaid: boolean) => {
+    // Check if security deposit is paid before allowing acceptance
+    if (status === "accepted" && !bookListingPaid) {
+      toast({
+        title: "Security Deposit Required",
+        description: "You must pay the security deposit before accepting purchase requests.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from("purchase_requests")
@@ -169,129 +209,191 @@ export const Requests = () => {
     }
   };
 
-  const RequestCard = ({ request, type }: { request: PurchaseRequest; type: "sent" | "received" }) => (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-lg">{request.books.title}</CardTitle>
-          <Badge className={getStatusColor(request.status)}>
-            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-          </Badge>
-        </div>
-        <p className="text-sm text-gray-600">by {request.books.author}</p>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Listed Price:</span>
-            <span>₹{request.books.price_range}</span>
+  const RequestCard = ({ request, type }: { request: PurchaseRequest; type: "sent" | "received" }) => {
+    const isSecurityDepositPaid = request.books.listing_paid;
+    
+    return (
+      <Card className="hover:shadow-lg transition-shadow">
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start">
+            <CardTitle className="text-lg">{request.books.title}</CardTitle>
+            <Badge className={getStatusColor(request.status)}>
+              {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+            </Badge>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Offered Price:</span>
-            <span className="font-semibold">₹{request.offered_price}</span>
+          <p className="text-sm text-gray-600">by {request.books.author}</p>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Listed Price:</span>
+              <span>₹{request.books.price_range}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Offered Price:</span>
+              <span className="font-semibold">₹{request.offered_price}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Transfer Mode:</span>
+              <span className="capitalize">{request.transfer_mode.replace("-", " ")}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">
+                {type === "sent" ? "Seller:" : "Buyer:"}
+              </span>
+              <span>
+                {type === "sent" 
+                  ? request.seller_profiles?.full_name || "Unknown"
+                  : request.buyer_profiles?.full_name || "Unknown"
+                }
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Transfer Mode:</span>
-            <span className="capitalize">{request.transfer_mode.replace("-", " ")}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">
-              {type === "sent" ? "Seller:" : "Buyer:"}
-            </span>
-            <span>
-              {type === "sent" 
-                ? request.seller_profiles?.full_name || "Unknown"
-                : request.buyer_profiles?.full_name || "Unknown"
-              }
-            </span>
-          </div>
-        </div>
 
-        {request.message && (
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <p className="text-sm text-gray-700">{request.message}</p>
-          </div>
-        )}
+          {/* Security Deposit Status for Received Requests */}
+          {type === "received" && (
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Security Deposit:</span>
+                <Badge variant={isSecurityDepositPaid ? "default" : "destructive"}>
+                  {isSecurityDepositPaid ? "Paid" : "Unpaid"}
+                </Badge>
+              </div>
+              {!isSecurityDepositPaid && (
+                <p className="text-xs text-orange-600 mt-1">
+                  Pay ₹50 security deposit to accept requests
+                </p>
+              )}
+            </div>
+          )}
 
-        {type === "received" && request.status === "pending" && (
-          <div className="flex space-x-2">
-            <Button
-              size="sm"
-              onClick={() => updateRequestStatus(request.id, "accepted")}
-              className="flex-1"
-            >
-              <Check className="h-4 w-4 mr-1" />
-              Accept
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => updateRequestStatus(request.id, "rejected")}
-              className="flex-1"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Reject
-            </Button>
-          </div>
-        )}
+          {request.message && (
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-700">{request.message}</p>
+            </div>
+          )}
 
-        {request.status === "accepted" && (
-          <div className="bg-green-50 p-3 rounded-lg space-y-2">
-            <p className="text-sm text-green-800">
-              Request accepted! Arrange delivery and use the delivery confirmation system.
-            </p>
+          {type === "received" && request.status === "pending" && (
+            <>
+              {!isSecurityDepositPaid ? (
+                <div className="space-y-2">
+                  <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm font-medium text-orange-800">Security Deposit Required</span>
+                    </div>
+                    <p className="text-xs text-orange-700 mb-3">
+                      You need to pay a ₹50 security deposit before you can accept purchase requests. 
+                      This deposit is refundable when your book sells.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => handlePaySecurityDeposit(request.books.id)}
+                      className="w-full bg-orange-600 hover:bg-orange-700"
+                    >
+                      <CreditCard className="h-4 w-4 mr-1" />
+                      Pay ₹50 Security Deposit
+                    </Button>
+                  </div>
+                  
+                  <div className="flex space-x-2 opacity-50">
+                    <Button size="sm" disabled className="flex-1">
+                      <Check className="h-4 w-4 mr-1" />
+                      Accept (Deposit Required)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => updateRequestStatus(request.id, "rejected", isSecurityDepositPaid)}
+                      className="flex-1"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    onClick={() => updateRequestStatus(request.id, "accepted", isSecurityDepositPaid)}
+                    className="flex-1"
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Accept
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => updateRequestStatus(request.id, "rejected", isSecurityDepositPaid)}
+                    className="flex-1"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Reject
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+
+          {request.status === "accepted" && (
+            <div className="bg-green-50 p-3 rounded-lg space-y-2">
+              <p className="text-sm text-green-800">
+                Request accepted! Arrange delivery and use the delivery confirmation system.
+              </p>
+              <Button 
+                size="sm" 
+                className="w-full"
+                onClick={() => setSelectedDeliveryRequest({
+                  requestId: request.id,
+                  userType: type === "sent" ? "buyer" : "seller",
+                  bookTitle: request.books.title,
+                  bookPrice: request.offered_price
+                })}
+              >
+                <Package className="h-4 w-4 mr-1" />
+                Delivery Confirmation
+              </Button>
+            </div>
+          )}
+
+          {request.status === "completed" && (
+            <div className="bg-green-50 p-3 rounded-lg">
+              <p className="text-sm text-green-800 mb-2">
+                Transaction completed successfully!
+              </p>
+              <Button 
+                size="sm" 
+                className="w-full"
+                onClick={() => setSelectedReviewRequest({
+                  requestId: request.id,
+                  reviewedUserId: type === "sent" ? request.seller_id! : request.buyer_id!,
+                  reviewedUserName: type === "sent" ? request.seller_profiles?.full_name || "Seller" : request.buyer_profiles?.full_name || "Buyer",
+                  bookTitle: request.books.title,
+                  reviewType: type === "sent" ? "buyer_to_seller" : "seller_to_buyer"
+                })}
+              >
+                Leave Review
+              </Button>
+            </div>
+          )}
+
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>{new Date(request.created_at).toLocaleDateString()}</span>
             <Button 
-              size="sm" 
-              className="w-full"
-              onClick={() => setSelectedDeliveryRequest({
-                requestId: request.id,
-                userType: type === "sent" ? "buyer" : "seller",
-                bookTitle: request.books.title,
-                bookPrice: request.offered_price
-              })}
+              variant="ghost" 
+              size="sm"
+              onClick={() => setSelectedChatRequest(request.id)}
             >
-              <Package className="h-4 w-4 mr-1" />
-              Delivery Confirmation
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Chat
             </Button>
           </div>
-        )}
-
-        {request.status === "completed" && (
-          <div className="bg-green-50 p-3 rounded-lg">
-            <p className="text-sm text-green-800 mb-2">
-              Transaction completed successfully!
-            </p>
-            <Button 
-              size="sm" 
-              className="w-full"
-              onClick={() => setSelectedReviewRequest({
-                requestId: request.id,
-                reviewedUserId: type === "sent" ? request.seller_id! : request.buyer_id!,
-                reviewedUserName: type === "sent" ? request.seller_profiles?.full_name || "Seller" : request.buyer_profiles?.full_name || "Buyer",
-                bookTitle: request.books.title,
-                reviewType: type === "sent" ? "buyer_to_seller" : "seller_to_buyer"
-              })}
-            >
-              Leave Review
-            </Button>
-          </div>
-        )}
-
-        <div className="flex justify-between text-xs text-gray-500">
-          <span>{new Date(request.created_at).toLocaleDateString()}</span>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => setSelectedChatRequest(request.id)}
-          >
-            <MessageSquare className="h-4 w-4 mr-1" />
-            Chat
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (loading) {
     return (

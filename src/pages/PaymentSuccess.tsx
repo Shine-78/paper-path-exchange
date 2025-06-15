@@ -86,7 +86,7 @@ export const PaymentSuccess = () => {
           {verified ? (
             <>
               <p className="text-gray-600">
-                Your security deposit of ₹100 has been processed successfully.
+                Your security deposit of ₹50 has been processed successfully.
               </p>
               <p className="text-gray-600">
                 Your book listing is now active and visible to buyers.
@@ -96,7 +96,7 @@ export const PaymentSuccess = () => {
                   <strong>Remember:</strong> When your book sells, you'll receive:
                 </p>
                 <p className="text-sm text-green-600 mt-1">
-                  Book Price + ₹100 Security Deposit - ₹20 Platform Fee
+                  Book Price + ₹30 Security Deposit Refund - ₹20 Platform Fee
                 </p>
               </div>
             </>
