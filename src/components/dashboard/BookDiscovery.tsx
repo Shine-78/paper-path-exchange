@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -82,24 +83,25 @@ export const BookDiscovery = () => {
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      // Build query parameters as an object to avoid complex type inference
-      const queryParams: any = {
-        status: "available"
-      };
+      // Start with base query - avoid complex type inference
+      let query = supabase.from("books").select("*").eq("status", "available");
 
-      if (selectedGenre) queryParams.genre = selectedGenre;
-      if (selectedYear) queryParams.publication_year = Number(selectedYear);
-      if (selectedISBN) queryParams.isbn = selectedISBN;
-      if (selectedCondition) queryParams.condition = selectedCondition;
-      if (selectedPriceRange) queryParams.price_range = selectedPriceRange;
-
-      // Start with base query
-      let query = supabase.from("books").select("*");
-
-      // Apply filters one by one
-      Object.entries(queryParams).forEach(([key, value]) => {
-        query = query.eq(key, value);
-      });
+      // Apply filters directly without dynamic iteration
+      if (selectedGenre) {
+        query = query.eq("genre", selectedGenre);
+      }
+      if (selectedYear) {
+        query = query.eq("publication_year", Number(selectedYear));
+      }
+      if (selectedISBN) {
+        query = query.eq("isbn", selectedISBN);
+      }
+      if (selectedCondition) {
+        query = query.eq("condition", selectedCondition);
+      }
+      if (selectedPriceRange) {
+        query = query.eq("price_range", selectedPriceRange);
+      }
 
       // Handle search term separately
       if (searchTerm) {
