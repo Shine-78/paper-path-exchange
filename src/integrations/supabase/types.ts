@@ -24,6 +24,7 @@ export type Database = {
           longitude: number | null
           postal_code: string | null
           price_range: number
+          quantity: number | null
           seller_id: string | null
           status: string | null
           title: string
@@ -44,6 +45,7 @@ export type Database = {
           longitude?: number | null
           postal_code?: string | null
           price_range: number
+          quantity?: number | null
           seller_id?: string | null
           status?: string | null
           title: string
@@ -64,6 +66,7 @@ export type Database = {
           longitude?: number | null
           postal_code?: string | null
           price_range?: number
+          quantity?: number | null
           seller_id?: string | null
           status?: string | null
           title?: string

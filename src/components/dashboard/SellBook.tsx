@@ -22,6 +22,7 @@ export const SellBook = () => {
     postal_code: "",
     latitude: null as number | null,
     longitude: null as number | null,
+    quantity: "1",
   });
   const [images, setImages] = useState<File[]>([]);
   const [imagePreview, setImagePreview] = useState<string[]>([]);
@@ -140,10 +141,20 @@ export const SellBook = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.author || !formData.condition || !formData.price_range || !formData.transfer_type) {
+    if (!formData.title || !formData.author || !formData.condition || !formData.price_range || !formData.transfer_type || !formData.quantity) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const quantity = parseInt(formData.quantity);
+    if (quantity < 1) {
+      toast({
+        title: "Error",
+        description: "Quantity must be at least 1",
         variant: "destructive",
       });
       return;
@@ -172,6 +183,7 @@ export const SellBook = () => {
         images: imageUrls,
         status: "available",
         listing_paid: false,
+        quantity: quantity,
       });
 
       // Create book listing with "available" status
@@ -192,6 +204,7 @@ export const SellBook = () => {
           images: imageUrls,
           status: "available",
           listing_paid: false,
+          quantity: quantity,
         });
 
       if (error) throw error;
@@ -213,6 +226,7 @@ export const SellBook = () => {
         postal_code: "",
         latitude: null,
         longitude: null,
+        quantity: "1",
       });
       setImages([]);
       imagePreview.forEach(url => URL.revokeObjectURL(url));
@@ -263,7 +277,7 @@ export const SellBook = () => {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <div>
                 <Label htmlFor="condition">Condition *</Label>
                 <Select value={formData.condition} onValueChange={(value) => setFormData({ ...formData, condition: value })}>
@@ -286,6 +300,18 @@ export const SellBook = () => {
                   value={formData.price_range}
                   onChange={(e) => setFormData({ ...formData, price_range: e.target.value })}
                   placeholder="Enter price"
+                  min="1"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="quantity">Quantity *</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  placeholder="Number of books"
                   min="1"
                   required
                 />

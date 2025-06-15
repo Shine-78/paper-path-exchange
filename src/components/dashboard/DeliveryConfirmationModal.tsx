@@ -169,6 +169,47 @@ export const DeliveryConfirmationModal = ({
 
       if (error) throw error;
 
+      // If seller is confirming payment, decrease book quantity
+      if (userType === 'seller' && !confirmation?.seller_confirmed_delivery) {
+        // Get the book ID from the purchase request
+        const { data: purchaseRequest, error: prError } = await supabase
+          .from('purchase_requests')
+          .select('book_id')
+          .eq('id', purchaseRequestId)
+          .single();
+
+        if (prError) {
+          console.error('Error fetching purchase request:', prError);
+        } else if (purchaseRequest?.book_id) {
+          // Get current book quantity
+          const { data: book, error: bookError } = await supabase
+            .from('books')
+            .select('quantity')
+            .eq('id', purchaseRequest.book_id)
+            .single();
+
+          if (bookError) {
+            console.error('Error fetching book:', bookError);
+          } else if (book && book.quantity > 0) {
+            // Decrease quantity by 1
+            const newQuantity = book.quantity - 1;
+            const { error: updateError } = await supabase
+              .from('books')
+              .update({ 
+                quantity: newQuantity,
+                status: newQuantity === 0 ? 'sold' : 'available'
+              })
+              .eq('id', purchaseRequest.book_id);
+
+            if (updateError) {
+              console.error('Error updating book quantity:', updateError);
+            } else {
+              console.log(`Book quantity decreased to ${newQuantity}`);
+            }
+          }
+        }
+      }
+
       toast({
         title: "Success",
         description: `Payment ${userType === 'buyer' ? 'confirmed' : 'acknowledged'} successfully!`,
