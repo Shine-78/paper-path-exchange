@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import { Header } from "./Header";
@@ -26,6 +25,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
   const [currentView, setCurrentView] = useState<DashboardView>("discover");
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckLoading, setAdminCheckLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null); // Ideally define type!
   const { toast } = useToast();
 
   useEffect(() => {
@@ -75,6 +75,21 @@ export const Dashboard = ({ user }: DashboardProps) => {
 
     checkAdminStatus();
 
+    // Fetch user profile if user exists
+    const fetchProfile = async () => {
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+        if (!error) {
+          setUserProfile(data);
+        }
+      }
+    };
+    fetchProfile();
+
     // Register service worker for PWA
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
@@ -85,7 +100,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
           console.log('SW registration failed: ', registrationError);
         });
     }
-  }, []);
+  }, [user]);
 
   const renderContent = () => {
     switch (currentView) {
@@ -96,7 +111,8 @@ export const Dashboard = ({ user }: DashboardProps) => {
       case "my-books":
         return <MyBooks />;
       case "requests":
-        return <Requests />;
+        // Pass userId and userProfile as props
+        return <Requests userId={user?.id} userProfile={userProfile} />;
       case "profile":
         return <Profile user={user} />;
       case "notifications":
