@@ -1,28 +1,62 @@
 
-import { useState } from "react";
-import { User } from "@supabase/supabase-js";
+import { useState, useEffect } from "react";
+import { Header } from "./Header";
 import { MobileHeader } from "./MobileHeader";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { BookDiscovery } from "./BookDiscovery";
 import { SellBook } from "./SellBook";
 import { MyBooks } from "./MyBooks";
-import { Profile } from "./Profile";
 import { Requests } from "./Requests";
+import { Profile } from "./Profile";
 import { NotificationCenter } from "./NotificationCenter";
 import { AdminDashboard } from "./AdminDashboard";
-import { UserPreferences } from "./UserPreferences";
+import { TransactionHistory } from "./TransactionHistory";
+import { PWAInstallPrompt } from "../pwa/PWAInstallPrompt";
+import { OfflineIndicator } from "../pwa/OfflineIndicator";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
-interface DashboardProps {
-  user: User | null;
-}
+export const Dashboard = () => {
+  const [activeTab, setActiveTab] = useState("discover");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { toast } = useToast();
 
-export type DashboardView = "discover" | "sell" | "my-books" | "requests" | "profile" | "notifications" | "admin" | "preferences";
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-export const Dashboard = ({ user }: DashboardProps) => {
-  const [currentView, setCurrentView] = useState<DashboardView>("discover");
+        const { data: adminData, error } = await supabase
+          .from('admin_users')
+          .select('user_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!error && adminData) {
+          setIsAdmin(true);
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    };
+
+    checkAdminStatus();
+
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('SW registered: ', registration);
+        })
+        .catch((registrationError) => {
+          console.log('SW registration failed: ', registrationError);
+        });
+    }
+  }, []);
 
   const renderContent = () => {
-    switch (currentView) {
+    switch (activeTab) {
       case "discover":
         return <BookDiscovery />;
       case "sell":
@@ -32,27 +66,53 @@ export const Dashboard = ({ user }: DashboardProps) => {
       case "requests":
         return <Requests />;
       case "profile":
-        return <Profile user={user} />;
+        return <Profile />;
       case "notifications":
         return <NotificationCenter />;
       case "admin":
-        return <AdminDashboard />;
-      case "preferences":
-        return <UserPreferences />;
+        return isAdmin ? <AdminDashboard /> : <BookDiscovery />;
+      case "transactions":
+        return <TransactionHistory />;
       default:
         return <BookDiscovery />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <MobileHeader currentView={currentView} setCurrentView={setCurrentView} />
+    <div className="min-h-screen bg-gray-50">
+      <PWAInstallPrompt />
+      <OfflineIndicator />
       
-      <main className="flex-1 px-4 py-4 pb-20 overflow-y-auto">
+      {/* Desktop Header */}
+      <div className="hidden md:block">
+        <Header 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          isAdmin={isAdmin}
+        />
+      </div>
+      
+      {/* Mobile Header */}
+      <div className="md:hidden">
+        <MobileHeader 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab}
+        />
+      </div>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6 pb-20 md:pb-6">
         {renderContent()}
       </main>
-      
-      <MobileBottomNav currentView={currentView} setCurrentView={setCurrentView} />
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden">
+        <MobileBottomNav 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab}
+          isAdmin={isAdmin}
+        />
+      </div>
     </div>
   );
 };

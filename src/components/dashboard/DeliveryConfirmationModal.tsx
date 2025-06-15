@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Clock, Package, CreditCard } from "lucide-react";
+import { CheckCircle, Clock, Package, AlertTriangle } from "lucide-react";
+import { PaymentMethodSelector } from "./PaymentMethodSelector";
+import { RefundSystem } from "./RefundSystem";
 
 interface DeliveryConfirmationModalProps {
   isOpen: boolean;
@@ -42,6 +44,8 @@ export const DeliveryConfirmationModal = ({
   const [confirmation, setConfirmation] = useState<DeliveryConfirmation | null>(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [showRefundSystem, setShowRefundSystem] = useState(false);
   const { toast } = useToast();
 
   const fetchConfirmation = async () => {
@@ -118,32 +122,50 @@ export const DeliveryConfirmationModal = ({
     }
   };
 
-  const handleStripePayment = async () => {
+  const handlePaymentMethodSelect = async (paymentMethod: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-book-payment', {
-        body: { 
-          purchaseRequestId, 
-          amount: bookPrice 
+      if (paymentMethod === 'stripe') {
+        const { data, error } = await supabase.functions.invoke('create-book-payment', {
+          body: { 
+            purchaseRequestId, 
+            amount: bookPrice 
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.url) {
+          window.open(data.url, '_blank');
+          
+          await supabase.functions.invoke('process-final-payment', {
+            body: { 
+              purchaseRequestId, 
+              buyerConfirmed: true, 
+              paymentMethod: 'stripe' 
+            }
+          });
+
+          fetchConfirmation();
+          setShowPaymentSelector(false);
         }
-      });
-
-      if (error) throw error;
-
-      // Open Stripe checkout in new tab
-      if (data.url) {
-        window.open(data.url, '_blank');
-        
-        // Mark as paid via Stripe
+      } else {
+        // Handle other payment methods
         await supabase.functions.invoke('process-final-payment', {
           body: { 
             purchaseRequestId, 
             buyerConfirmed: true, 
-            paymentMethod: 'stripe' 
+            paymentMethod 
           }
         });
 
+        toast({
+          title: "Payment Confirmed",
+          description: `Payment confirmed via ${paymentMethod}`,
+        });
+
         fetchConfirmation();
+        setShowPaymentSelector(false);
       }
     } catch (error: any) {
       toast({
@@ -252,166 +274,205 @@ export const DeliveryConfirmationModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Delivery Confirmation</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delivery Confirmation</DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          <div className="text-center">
-            <h3 className="font-semibold">{bookTitle}</h3>
-            <p className="text-sm text-gray-600">Price: ₹{bookPrice}</p>
-          </div>
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="font-semibold">{bookTitle}</h3>
+              <p className="text-sm text-gray-600">Price: ₹{bookPrice}</p>
+            </div>
 
-          <div className="space-y-4">
-            {/* Step 1: OTP Verification */}
-            <div className="flex items-start space-x-3">
-              <StatusIcon status={getStepStatus(1)} />
-              <div className="flex-1">
-                <h4 className="font-medium">1. Delivery OTP Verification</h4>
-                <p className="text-sm text-gray-600">Buyer confirms receipt with OTP</p>
-                
-                {userType === 'buyer' && !confirmation?.otp_verified_at && (
-                  <div className="mt-2 space-y-2">
-                    {!confirmation ? (
-                      <Button size="sm" onClick={sendOTP} disabled={sending}>
-                        {sending ? "Sending..." : "Get OTP"}
-                      </Button>
-                    ) : (
-                      <div className="space-y-2">
-                        <Label htmlFor="otp">Enter OTP (Check Email)</Label>
-                        <div className="flex space-x-2">
-                          <Input
-                            id="otp"
-                            value={otpCode}
-                            onChange={(e) => setOtpCode(e.target.value)}
-                            placeholder="6-digit OTP"
-                            maxLength={6}
-                            className="flex-1"
-                          />
-                          <Button size="sm" onClick={verifyOTP} disabled={loading || otpCode.length !== 6}>
-                            Verify
-                          </Button>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="link"
-                          onClick={sendOTP}
-                          disabled={sending}
-                          className="p-0 h-auto"
-                        >
-                          {sending ? "Sending..." : "Resend OTP"}
+            <div className="space-y-4">
+              {/* Step 1: OTP Verification */}
+              <div className="flex items-start space-x-3">
+                <StatusIcon status={getStepStatus(1)} />
+                <div className="flex-1">
+                  <h4 className="font-medium">1. Delivery OTP Verification</h4>
+                  <p className="text-sm text-gray-600">Buyer confirms receipt with OTP</p>
+                  
+                  {userType === 'buyer' && !confirmation?.otp_verified_at && (
+                    <div className="mt-2 space-y-2">
+                      {!confirmation ? (
+                        <Button size="sm" onClick={sendOTP} disabled={sending}>
+                          {sending ? "Sending..." : "Get OTP"}
                         </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Step 2: Delivery Confirmation */}
-            <div className="flex items-start space-x-3">
-              <StatusIcon status={getStepStatus(2)} />
-              <div className="flex-1">
-                <h4 className="font-medium">2. Delivery Confirmation</h4>
-                <p className="text-sm text-gray-600">Both parties confirm delivery</p>
-                
-                {confirmation?.otp_verified_at && (
-                  <div className="mt-2 space-y-1">
-                    <Badge variant={confirmation.buyer_confirmed_delivery ? "default" : "secondary"}>
-                      Buyer: {confirmation.buyer_confirmed_delivery ? "Confirmed" : "Pending"}
-                    </Badge>
-                    <Badge variant={confirmation.seller_confirmed_delivery ? "default" : "secondary"}>
-                      Seller: {confirmation.seller_confirmed_delivery ? "Confirmed" : "Pending"}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Step 3: Payment */}
-            <div className="flex items-start space-x-3">
-              <StatusIcon status={getStepStatus(3)} />
-              <div className="flex-1">
-                <h4 className="font-medium">3. Payment</h4>
-                <p className="text-sm text-gray-600">Complete payment to seller</p>
-                
-                {confirmation?.otp_verified_at && (
-                  <div className="mt-2 space-y-2">
-                    {userType === 'buyer' && !confirmation.buyer_confirmed_payment && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Choose payment method:</p>
-                        <div className="flex space-x-2">
-                          <Button 
-                            size="sm" 
-                            onClick={handleStripePayment} 
-                            disabled={loading}
-                            className="flex-1"
+                      ) : (
+                        <div className="space-y-2">
+                          <Label htmlFor="otp">Enter OTP (Check Email)</Label>
+                          <div className="flex space-x-2">
+                            <Input
+                              id="otp"
+                              value={otpCode}
+                              onChange={(e) => setOtpCode(e.target.value)}
+                              placeholder="6-digit OTP"
+                              maxLength={6}
+                              className="flex-1"
+                            />
+                            <Button size="sm" onClick={verifyOTP} disabled={loading || otpCode.length !== 6}>
+                              Verify
+                            </Button>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="link"
+                            onClick={sendOTP}
+                            disabled={sending}
+                            className="p-0 h-auto"
                           >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Pay ₹{bookPrice} via Stripe
+                            {sending ? "Sending..." : "Resend OTP"}
                           </Button>
                         </div>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => confirmPayment('other')} 
-                          disabled={loading}
-                          className="w-full"
-                        >
-                          Paid Outside App
-                        </Button>
-                      </div>
-                    )}
-                    
-                    {userType === 'seller' && confirmation.buyer_confirmed_payment && !confirmation.seller_confirmed_payment && (
-                      <Button size="sm" onClick={() => confirmPayment('confirmed')} disabled={loading}>
-                        <Package className="h-4 w-4 mr-1" />
-                        Confirm Payment Received
-                      </Button>
-                    )}
-                    
-                    <div className="space-y-1">
-                      <Badge variant={confirmation.buyer_confirmed_payment ? "default" : "secondary"}>
-                        Buyer Payment: {confirmation.buyer_confirmed_payment ? "Confirmed" : "Pending"}
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Step 2: Delivery Confirmation */}
+              <div className="flex items-start space-x-3">
+                <StatusIcon status={getStepStatus(2)} />
+                <div className="flex-1">
+                  <h4 className="font-medium">2. Delivery Confirmation</h4>
+                  <p className="text-sm text-gray-600">Both parties confirm delivery</p>
+                  
+                  {confirmation?.otp_verified_at && (
+                    <div className="mt-2 space-y-1">
+                      <Badge variant={confirmation.buyer_confirmed_delivery ? "default" : "secondary"}>
+                        Buyer: {confirmation.buyer_confirmed_delivery ? "Confirmed" : "Pending"}
                       </Badge>
-                      <Badge variant={confirmation.seller_confirmed_payment ? "default" : "secondary"}>
-                        Seller Confirmation: {confirmation.seller_confirmed_payment ? "Confirmed" : "Pending"}
+                      <Badge variant={confirmation.seller_confirmed_delivery ? "default" : "secondary"}>
+                        Seller: {confirmation.seller_confirmed_delivery ? "Confirmed" : "Pending"}
                       </Badge>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Step 3: Payment */}
+              <div className="flex items-start space-x-3">
+                <StatusIcon status={getStepStatus(3)} />
+                <div className="flex-1">
+                  <h4 className="font-medium">3. Payment</h4>
+                  <p className="text-sm text-gray-600">Complete payment to seller</p>
+                  
+                  {confirmation?.otp_verified_at && (
+                    <div className="mt-2 space-y-2">
+                      {userType === 'buyer' && !confirmation.buyer_confirmed_payment && (
+                        <div className="space-y-2">
+                          <Button 
+                            size="sm" 
+                            onClick={() => setShowPaymentSelector(true)} 
+                            disabled={loading}
+                            className="w-full"
+                          >
+                            Choose Payment Method
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => confirmPayment('other')} 
+                            disabled={loading}
+                            className="w-full"
+                          >
+                            Paid Outside App
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {userType === 'seller' && confirmation.buyer_confirmed_payment && !confirmation.seller_confirmed_payment && (
+                        <Button size="sm" onClick={() => confirmPayment('confirmed')} disabled={loading}>
+                          <Package className="h-4 w-4 mr-1" />
+                          Confirm Payment Received
+                        </Button>
+                      )}
+                      
+                      <div className="space-y-1">
+                        <Badge variant={confirmation.buyer_confirmed_payment ? "default" : "secondary"}>
+                          Buyer Payment: {confirmation.buyer_confirmed_payment ? "Confirmed" : "Pending"}
+                        </Badge>
+                        <Badge variant={confirmation.seller_confirmed_payment ? "default" : "secondary"}>
+                          Seller Confirmation: {confirmation.seller_confirmed_payment ? "Confirmed" : "Pending"}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Step 4: Final Payout */}
+              <div className="flex items-start space-x-3">
+                <StatusIcon status={getStepStatus(4)} />
+                <div className="flex-1">
+                  <h4 className="font-medium">4. Final Payout</h4>
+                  <p className="text-sm text-gray-600">
+                    Seller receives ₹{bookPrice + 30} (₹{bookPrice} + ₹30 BookEx bonus)
+                  </p>
+                  
+                  {confirmation?.final_payout_processed && (
+                    <Badge className="mt-2">Completed</Badge>
+                  )}
+                </div>
               </div>
             </div>
 
-            <Separator />
-
-            {/* Step 4: Final Payout */}
-            <div className="flex items-start space-x-3">
-              <StatusIcon status={getStepStatus(4)} />
-              <div className="flex-1">
-                <h4 className="font-medium">4. Final Payout</h4>
-                <p className="text-sm text-gray-600">
-                  Seller receives ₹{bookPrice + 30} (₹{bookPrice} + ₹30 BookEx bonus)
-                </p>
-                
-                {confirmation?.final_payout_processed && (
-                  <Badge className="mt-2">Completed</Badge>
-                )}
+            {/* Refund Option for Buyers */}
+            {userType === 'buyer' && confirmation?.buyer_confirmed_payment && (
+              <div className="bg-orange-50 p-3 rounded-lg">
+                <div className="flex items-center space-x-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm font-medium text-orange-800">Issue with your order?</span>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setShowRefundSystem(true)}
+                  className="w-full"
+                >
+                  Request Refund
+                </Button>
               </div>
-            </div>
+            )}
+
+            <Button variant="outline" onClick={onClose} className="w-full">
+              Close
+            </Button>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <Button variant="outline" onClick={onClose} className="w-full">
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Payment Method Selector Modal */}
+      <Dialog open={showPaymentSelector} onOpenChange={setShowPaymentSelector}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Payment Method</DialogTitle>
+          </DialogHeader>
+          <PaymentMethodSelector
+            onPaymentMethodSelect={handlePaymentMethodSelect}
+            loading={loading}
+            amount={bookPrice}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Refund System Modal */}
+      <RefundSystem
+        isOpen={showRefundSystem}
+        onClose={() => setShowRefundSystem(false)}
+        purchaseRequestId={purchaseRequestId}
+        bookTitle={bookTitle}
+        amount={bookPrice}
+      />
+    </>
   );
 };
