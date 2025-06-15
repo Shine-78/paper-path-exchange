@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -6,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Check, X, Clock, Package, CreditCard, AlertTriangle } from "lucide-react";
+import { MessageSquare, Check, X, Clock, Package, CreditCard, AlertTriangle, Calendar } from "lucide-react";
 import { ChatModal } from "./ChatModal";
 import { ReviewModal } from "./ReviewModal";
 import { DeliveryConfirmationModal } from "./DeliveryConfirmationModal";
+import { DeliveryDateSelector } from "./DeliveryDateSelector";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 interface PurchaseRequest {
@@ -19,6 +19,7 @@ interface PurchaseRequest {
   message?: string;
   status: string;
   created_at: string;
+  expected_delivery_date?: string;
   buyer_id?: string;
   seller_id?: string;
   book_id?: string;
@@ -56,6 +57,8 @@ export const Requests = () => {
     bookTitle: string;
     bookPrice: number;
   } | null>(null);
+  const [showDeliveryDateSelector, setShowDeliveryDateSelector] = useState<string | null>(null);
+  const [acceptingRequest, setAcceptingRequest] = useState<string | null>(null);
   const { toast } = useToast();
   const { playNotificationSound } = useNotificationSound();
 
@@ -159,7 +162,7 @@ export const Requests = () => {
     }
   };
 
-  const updateRequestStatus = async (requestId: string, status: string, bookListingPaid: boolean) => {
+  const updateRequestStatus = async (requestId: string, status: string, bookListingPaid: boolean, deliveryDate?: string) => {
     // Check if security deposit is paid before allowing acceptance
     if (status === "accepted" && !bookListingPaid) {
       toast({
@@ -171,22 +174,44 @@ export const Requests = () => {
     }
 
     try {
+      const updateData: any = { status };
+      if (deliveryDate) {
+        updateData.expected_delivery_date = deliveryDate;
+      }
+
       const { error } = await supabase
         .from("purchase_requests")
-        .update({ status })
+        .update(updateData)
         .eq("id", requestId);
 
       if (error) throw error;
 
+      // If accepting with delivery date, send notification
+      if (status === "accepted" && deliveryDate) {
+        try {
+          await supabase.functions.invoke('send-delivery-notification', {
+            body: { 
+              purchaseRequestId: requestId, 
+              expectedDeliveryDate: deliveryDate 
+            }
+          });
+        } catch (notificationError) {
+          console.error('Error sending delivery notification:', notificationError);
+          // Don't fail the acceptance if notification fails
+        }
+      }
+
       setReceivedRequests(requests =>
         requests.map(req => 
-          req.id === requestId ? { ...req, status } : req
+          req.id === requestId ? { ...req, status, expected_delivery_date: deliveryDate } : req
         )
       );
 
       toast({
         title: "Success",
-        description: `Request ${status}`,
+        description: status === "accepted" 
+          ? `Request accepted! Buyer has been notified of the expected delivery date.`
+          : `Request ${status}`,
       });
 
       playNotificationSound();
@@ -197,6 +222,27 @@ export const Requests = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleAcceptWithDeliveryDate = (requestId: string) => {
+    setShowDeliveryDateSelector(requestId);
+    setAcceptingRequest(requestId);
+  };
+
+  const handleDeliveryDateSelect = async (deliveryDate: string) => {
+    if (acceptingRequest) {
+      const request = receivedRequests.find(r => r.id === acceptingRequest);
+      if (request) {
+        await updateRequestStatus(acceptingRequest, "accepted", request.books.listing_paid, deliveryDate);
+      }
+      setShowDeliveryDateSelector(null);
+      setAcceptingRequest(null);
+    }
+  };
+
+  const handleCancelDeliveryDate = () => {
+    setShowDeliveryDateSelector(null);
+    setAcceptingRequest(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -249,6 +295,20 @@ export const Requests = () => {
                 }
               </span>
             </div>
+            
+            {/* Show expected delivery date if available */}
+            {request.expected_delivery_date && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Expected Delivery:</span>
+                <span className="text-green-600 font-medium">
+                  {new Date(request.expected_delivery_date).toLocaleDateString('en-IN', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Security Deposit Status for Received Requests */}
@@ -317,11 +377,11 @@ export const Requests = () => {
                 <div className="flex space-x-2">
                   <Button
                     size="sm"
-                    onClick={() => updateRequestStatus(request.id, "accepted", isSecurityDepositPaid)}
+                    onClick={() => handleAcceptWithDeliveryDate(request.id)}
                     className="flex-1"
                   >
-                    <Check className="h-4 w-4 mr-1" />
-                    Accept
+                    <Calendar className="h-4 w-4 mr-1" />
+                    Accept & Set Date
                   </Button>
                   <Button
                     size="sm"
@@ -340,7 +400,7 @@ export const Requests = () => {
           {request.status === "accepted" && (
             <div className="bg-green-50 p-3 rounded-lg space-y-2">
               <p className="text-sm text-green-800">
-                Request accepted! Arrange delivery and use the delivery confirmation system.
+                Request accepted! {request.expected_delivery_date && `Delivery expected by ${new Date(request.expected_delivery_date).toLocaleDateString('en-IN')}.`}
               </p>
               <Button 
                 size="sm" 
@@ -495,6 +555,17 @@ export const Requests = () => {
           bookTitle={selectedDeliveryRequest.bookTitle}
           bookPrice={selectedDeliveryRequest.bookPrice}
         />
+      )}
+
+      {/* Delivery Date Selector Modal */}
+      {showDeliveryDateSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <DeliveryDateSelector
+            onDateSelect={handleDeliveryDateSelect}
+            onCancel={handleCancelDeliveryDate}
+            loading={false}
+          />
+        </div>
       )}
     </div>
   );

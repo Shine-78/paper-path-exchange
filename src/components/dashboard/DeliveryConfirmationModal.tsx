@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Clock, Package, AlertTriangle } from "lucide-react";
+import { CheckCircle, Clock, Package, AlertTriangle, Calendar } from "lucide-react";
 import { PaymentMethodSelector } from "./PaymentMethodSelector";
 import { RefundSystem } from "./RefundSystem";
 
@@ -30,6 +29,7 @@ interface DeliveryConfirmation {
   seller_confirmed_payment: boolean;
   payment_method: string | null;
   final_payout_processed: boolean;
+  expected_delivery_date: string | null;
 }
 
 export const DeliveryConfirmationModal = ({
@@ -46,10 +46,21 @@ export const DeliveryConfirmationModal = ({
   const [sending, setSending] = useState(false);
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [showRefundSystem, setShowRefundSystem] = useState(false);
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchConfirmation = async () => {
     try {
+      // First get the expected delivery date from purchase request
+      const { data: purchaseRequest, error: prError } = await supabase
+        .from('purchase_requests')
+        .select('expected_delivery_date')
+        .eq('id', purchaseRequestId)
+        .single();
+
+      if (prError) throw prError;
+      setExpectedDeliveryDate(purchaseRequest?.expected_delivery_date || null);
+
       const { data, error } = await supabase
         .from('delivery_confirmations')
         .select('*')
@@ -273,6 +284,15 @@ export const DeliveryConfirmationModal = ({
     return <Clock className="h-5 w-5 text-gray-400" />;
   };
 
+  const formatDeliveryDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -285,6 +305,18 @@ export const DeliveryConfirmationModal = ({
             <div className="text-center">
               <h3 className="font-semibold">{bookTitle}</h3>
               <p className="text-sm text-gray-600">Price: ₹{bookPrice}</p>
+              
+              {/* Show expected delivery date */}
+              {expectedDeliveryDate && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-center space-x-2">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">
+                      Expected Delivery: {formatDeliveryDate(expectedDeliveryDate)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">

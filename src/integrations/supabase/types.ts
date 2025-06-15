@@ -151,6 +151,7 @@ export type Database = {
           buyer_confirmed_payment: boolean | null
           buyer_id: string | null
           created_at: string | null
+          expected_delivery_date: string | null
           final_payout_processed: boolean | null
           id: string
           otp_code: string
@@ -169,6 +170,7 @@ export type Database = {
           buyer_confirmed_payment?: boolean | null
           buyer_id?: string | null
           created_at?: string | null
+          expected_delivery_date?: string | null
           final_payout_processed?: boolean | null
           id?: string
           otp_code: string
@@ -187,6 +189,7 @@ export type Database = {
           buyer_confirmed_payment?: boolean | null
           buyer_id?: string | null
           created_at?: string | null
+          expected_delivery_date?: string | null
           final_payout_processed?: boolean | null
           id?: string
           otp_code?: string
@@ -327,6 +330,7 @@ export type Database = {
           book_id: string | null
           buyer_id: string | null
           created_at: string | null
+          expected_delivery_date: string | null
           id: string
           message: string | null
           offered_price: number
@@ -339,6 +343,7 @@ export type Database = {
           book_id?: string | null
           buyer_id?: string | null
           created_at?: string | null
+          expected_delivery_date?: string | null
           id?: string
           message?: string | null
           offered_price: number
@@ -351,6 +356,7 @@ export type Database = {
           book_id?: string | null
           buyer_id?: string | null
           created_at?: string | null
+          expected_delivery_date?: string | null
           id?: string
           message?: string | null
           offered_price?: number
