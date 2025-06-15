@@ -114,15 +114,13 @@ export const BookDiscovery = () => {
         query = query.eq("price_range", selectedPriceRange);
       }
 
-      // Fix: Explicitly annotate data type from Supabase
-      const { data, error } = await query.order("created_at", { ascending: false }) as {
-        data: Book[] | null;
-        error: any;
-      };
+      // Don't force a type on result here, let TS infer as 'any'
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      let filteredBooks: Book[] = data || [];
+      // Explicitly type data as Book[] at point-of-use
+      let filteredBooks: Book[] = (data ?? []) as Book[];
       // Filter by radius (if user location is available)
       if (userCoords && selectedRadius) {
         filteredBooks = filteredBooks.filter((book) => {
@@ -148,7 +146,7 @@ export const BookDiscovery = () => {
         selectedISBN && `ISBN: ${selectedISBN}`,
         selectedCondition && `Condition: ${selectedCondition}`,
         selectedPriceRange && `Price: ₹${selectedPriceRange}`,
-        userCoords && selectedRadius && `Within ${selectedRadius}km`,
+        userCoords && selectedRadius && `Within ${selectedRadius}km`
       ]
         .filter(Boolean)
         .join(" | ");
