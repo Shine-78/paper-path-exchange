@@ -25,25 +25,51 @@ interface DashboardProps {
 export const Dashboard = ({ user }: DashboardProps) => {
   const [currentView, setCurrentView] = useState<DashboardView>("discover");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCheckLoading, setAdminCheckLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     const checkAdminStatus = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) {
+          setAdminCheckLoading(false);
+          return;
+        }
 
+        // Check admin_users table first
         const { data: adminData, error } = await supabase
           .from('admin_users')
           .select('user_id')
-          .eq('user_id', user.id)
+          .eq('user_id', currentUser.id)
           .single();
 
         if (!error && adminData) {
           setIsAdmin(true);
+          console.log('User is admin via admin_users table');
+        } else {
+          // Fallback check for specific admin email
+          const isAdminByEmail = currentUser.email === "arnabmanna203@gmail.com";
+          if (isAdminByEmail) {
+            setIsAdmin(true);
+            console.log('User is admin via email check');
+            
+            // Optionally add them to admin_users table
+            const { error: insertError } = await supabase
+              .from('admin_users')
+              .insert({ user_id: currentUser.id })
+              .select()
+              .single();
+            
+            if (!insertError) {
+              console.log('Added admin user to admin_users table');
+            }
+          }
         }
       } catch (error) {
         console.error('Error checking admin status:', error);
+      } finally {
+        setAdminCheckLoading(false);
       }
     };
 
@@ -76,7 +102,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
       case "notifications":
         return <NotificationCenter />;
       case "admin":
-        return isAdmin ? <AdminDashboard /> : <BookDiscovery />;
+        return <AdminDashboard />;
       case "transactions":
         return <TransactionHistory />;
       default:
@@ -103,6 +129,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
         <MobileHeader 
           currentView={currentView} 
           setCurrentView={setCurrentView}
+          isAdmin={isAdmin}
         />
       </div>
 

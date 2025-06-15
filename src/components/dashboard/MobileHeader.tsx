@@ -1,7 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Bell, Settings, LogOut } from "lucide-react";
+import { BookOpen, Bell, Settings, LogOut, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DashboardView } from "@/types/dashboard";
 import { useState, useEffect } from "react";
@@ -11,14 +10,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 interface MobileHeaderProps {
   currentView: DashboardView;
   setCurrentView: (view: DashboardView) => void;
+  isAdmin?: boolean;
 }
 
-export const MobileHeader = ({ currentView, setCurrentView }: MobileHeaderProps) => {
+export const MobileHeader = ({ currentView, setCurrentView, isAdmin }: MobileHeaderProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { playNotificationSound } = useNotificationSound();
 
@@ -123,15 +124,27 @@ export const MobileHeader = ({ currentView, setCurrentView }: MobileHeaderProps)
                 <Settings className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 bg-white">
               <DropdownMenuItem onClick={() => setCurrentView("preferences")}>
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCurrentView("admin")}>
-                <BookOpen className="h-4 w-4 mr-2" />
-                Admin Panel
-              </DropdownMenuItem>
+              
+              {/* Admin Panel - Only visible to admins */}
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => setCurrentView("admin")}
+                    className="bg-gradient-to-r from-purple-50 to-blue-50 text-purple-700"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Admin Dashboard
+                  </DropdownMenuItem>
+                </>
+              )}
+              
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out

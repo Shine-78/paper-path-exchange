@@ -1,7 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Search, Plus, Library, MessageSquare, User, LogOut, Bell } from "lucide-react";
+import { BookOpen, Search, Plus, Library, MessageSquare, User, LogOut, Bell, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DashboardView } from "@/types/dashboard";
 import { useState, useEffect } from "react";
@@ -127,9 +126,21 @@ export const Header = ({ currentView, setCurrentView, isAdmin }: HeaderProps) =>
                 <span>{label}</span>
               </Button>
             ))}
+            
+            {/* Admin Dashboard Button - Only visible to admins */}
+            {isAdmin && (
+              <Button
+                variant={currentView === "admin" ? "default" : "ghost"}
+                onClick={() => setCurrentView("admin")}
+                className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700"
+              >
+                <Shield className="h-4 w-4" />
+                <span>Admin</span>
+              </Button>
+            )}
           </nav>
 
-          {/* Notification Bell and Sign Out */}
+          {/* Right side actions */}
           <div className="flex items-center space-x-2">
             <Button
               variant={currentView === "notifications" ? "default" : "ghost"}

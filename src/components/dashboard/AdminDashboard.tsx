@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, BookOpen, MessageSquare, TrendingUp, Eye, Ban } from "lucide-react";
+import { Users, BookOpen, MessageSquare, TrendingUp, Eye, Ban, Shield, Activity, DollarSign } from "lucide-react";
 
 interface DashboardStats {
   totalUsers: number;
@@ -49,32 +49,27 @@ export const AdminDashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
-  // Update: check admin_users table first
   const checkAdminStatus = async () => {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
       if (!user) return false;
 
-      // First, check admin_users table for this user's id
+      // Check admin_users table
       const { data: adminUsers, error } = await supabase
         .from("admin_users")
         .select("user_id")
         .eq("user_id", user.id);
+      
       if (error) {
-        toast({
-          title: "Error",
-          description: "Could not access admin status. Please try again.",
-          variant: "destructive",
-        });
+        console.error('Error checking admin status:', error);
         return false;
       }
+      
       if (adminUsers && adminUsers.length > 0) return true;
 
-      // Fallback: allow email-based access for this specific admin only
-      const isAdminUser =
-        user.email === "arnabmanna203@gmail.com" ||
-        false;
+      // Fallback: allow email-based access
+      const isAdminUser = user.email === "arnabmanna203@gmail.com";
       return isAdminUser;
     } catch {
       return false;
@@ -212,21 +207,23 @@ export const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     );
   }
 
   if (!isAdmin) {
     return (
-      <Card>
+      <Card className="mx-auto max-w-md">
         <CardContent className="text-center py-12">
-          <Ban className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Denied</h3>
-          <p className="text-gray-600">You don't have admin privileges to access this dashboard.</p>
-          <p className="text-sm text-gray-500 mt-2">
-            To access admin dashboard, use an email with 'admin' in it or contact the administrator.
-          </p>
+          <Ban className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h3>
+          <p className="text-gray-600 mb-4">You don't have admin privileges to access this dashboard.</p>
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Admin Access:</strong> Contact the administrator to get admin privileges or use an authorized admin account.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -234,93 +231,103 @@ export const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <TrendingUp className="h-5 w-5" />
-            <span>Admin Dashboard</span>
-          </CardTitle>
-        </CardHeader>
-      </Card>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-6 text-white">
+        <div className="flex items-center space-x-3">
+          <Shield className="h-8 w-8" />
+          <div>
+            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+            <p className="text-purple-100">Manage your BookEx platform</p>
+          </div>
+        </div>
+      </div>
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardContent className="p-6">
-            <div className="flex items-center">
-              <Users className="h-4 w-4 text-blue-600" />
-              <div className="ml-2">
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold">{stats.totalUsers}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600">Total Users</p>
+                <p className="text-3xl font-bold text-blue-700">{stats.totalUsers}</p>
               </div>
+              <Users className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
           <CardContent className="p-6">
-            <div className="flex items-center">
-              <BookOpen className="h-4 w-4 text-green-600" />
-              <div className="ml-2">
-                <p className="text-sm font-medium text-gray-600">Total Books</p>
-                <p className="text-2xl font-bold">{stats.totalBooks}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-600">Total Books</p>
+                <p className="text-3xl font-bold text-green-700">{stats.totalBooks}</p>
               </div>
+              <BookOpen className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
           <CardContent className="p-6">
-            <div className="flex items-center">
-              <MessageSquare className="h-4 w-4 text-purple-600" />
-              <div className="ml-2">
-                <p className="text-sm font-medium text-gray-600">Transactions</p>
-                <p className="text-2xl font-bold">{stats.totalTransactions}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-600">Transactions</p>
+                <p className="text-3xl font-bold text-purple-700">{stats.totalTransactions}</p>
               </div>
+              <Activity className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
           <CardContent className="p-6">
-            <div className="flex items-center">
-              <TrendingUp className="h-4 w-4 text-orange-600" />
-              <div className="ml-2">
-                <p className="text-sm font-medium text-gray-600">Revenue</p>
-                <p className="text-2xl font-bold">₹{stats.revenue}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-600">Revenue</p>
+                <p className="text-3xl font-bold text-orange-700">₹{stats.revenue}</p>
               </div>
+              <DollarSign className="h-8 w-8 text-orange-600" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="books">Books</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-gray-100">
+          <TabsTrigger value="users" className="data-[state=active]:bg-white">Users Management</TabsTrigger>
+          <TabsTrigger value="books" className="data-[state=active]:bg-white">Books Management</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Users</CardTitle>
+              <CardTitle className="flex items-center space-x-2">
+                <Users className="h-5 w-5" />
+                <span>Recent Users</span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {users.map((user) => (
-                  <div key={user.id} className="flex justify-between items-center p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{user.full_name || 'Unknown'}</p>
-                      <p className="text-sm text-gray-600">{user.email}</p>
-                      <p className="text-xs text-gray-400">
-                        Joined: {new Date(user.created_at).toLocaleDateString()}
-                      </p>
-                      {(user.total_reviews || 0) > 0 && (
-                        <p className="text-xs text-green-600">
-                          Rating: {(user.average_rating || 0).toFixed(1)} ({user.total_reviews} reviews)
-                        </p>
-                      )}
+                  <div key={user.id} className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <User className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{user.full_name || 'Unknown User'}</p>
+                          <p className="text-sm text-gray-600">{user.email}</p>
+                          <p className="text-xs text-gray-400">
+                            Joined: {new Date(user.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
                     </div>
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      Active
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -331,29 +338,39 @@ export const AdminDashboard = () => {
         <TabsContent value="books" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Books</CardTitle>
+              <CardTitle className="flex items-center space-x-2">
+                <BookOpen className="h-5 w-5" />
+                <span>Recent Books</span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {books.map((book) => (
-                  <div key={book.id} className="flex justify-between items-center p-4 border rounded-lg">
+                  <div key={book.id} className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex-1">
-                      <p className="font-medium">{book.title}</p>
-                      <p className="text-sm text-gray-600">by {book.author}</p>
-                      <p className="text-sm text-gray-600">
-                        Seller: {book.seller?.full_name || book.seller?.email || 'Unknown'}
-                      </p>
-                      <p className="text-sm text-gray-600">Price: ₹{book.price_range}</p>
-                      <p className="text-xs text-gray-400">
-                        Listed: {new Date(book.created_at).toLocaleDateString()}
-                      </p>
+                      <div className="flex items-start space-x-3">
+                        <div className="w-12 h-16 bg-gray-200 rounded flex items-center justify-center">
+                          <BookOpen className="h-6 w-6 text-gray-500" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{book.title}</p>
+                          <p className="text-sm text-gray-600">by {book.author}</p>
+                          <p className="text-sm text-gray-600">
+                            Seller: {book.seller?.full_name || book.seller?.email || 'Unknown'}
+                          </p>
+                          <p className="text-sm font-medium text-green-600">Price: ₹{book.price_range}</p>
+                          <p className="text-xs text-gray-400">
+                            Listed: {new Date(book.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge 
                         className={
-                          book.status === 'available' ? 'bg-green-100 text-green-800' :
-                          book.status === 'sold' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
+                          book.status === 'available' ? 'bg-green-100 text-green-800 border-green-200' :
+                          book.status === 'sold' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                          'bg-gray-100 text-gray-800 border-gray-200'
                         }
                       >
                         {book.status}
@@ -363,8 +380,9 @@ export const AdminDashboard = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => updateBookStatus(book.id, 'inactive')}
+                          className="text-orange-600 border-orange-200 hover:bg-orange-50"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Ban className="h-4 w-4 mr-1" />
                           Hide
                         </Button>
                       )}
@@ -373,6 +391,7 @@ export const AdminDashboard = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => updateBookStatus(book.id, 'available')}
+                          className="text-green-600 border-green-200 hover:bg-green-50"
                         >
                           <Eye className="h-4 w-4 mr-1" />
                           Show
