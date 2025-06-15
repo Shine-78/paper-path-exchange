@@ -21,7 +21,7 @@ interface Review {
 interface BookReviewsProps {
   bookId: string;
   sellerId: string;
-  key?: string | number; // Add key prop to force re-render
+  key?: string | number;
 }
 
 export const BookReviews = ({ bookId, sellerId, key }: BookReviewsProps) => {
@@ -91,6 +91,29 @@ export const BookReviews = ({ bookId, sellerId, key }: BookReviewsProps) => {
       fetchSellerRating();
     }
   }, [bookId, sellerId, key]);
+
+  // Set up real-time subscription for new reviews
+  useEffect(() => {
+    if (!bookId) return;
+
+    const channel = supabase
+      .channel('reviews_updates')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'reviews',
+        filter: `book_id=eq.${bookId}`
+      }, (payload) => {
+        console.log('New review added:', payload);
+        fetchReviews();
+        fetchSellerRating();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [bookId]);
 
   if (loading) {
     return <div className="animate-pulse h-32 bg-gray-200 rounded"></div>;

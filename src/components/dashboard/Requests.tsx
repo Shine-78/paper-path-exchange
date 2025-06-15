@@ -18,6 +18,8 @@ interface PurchaseRequest {
   message?: string;
   status: string;
   created_at: string;
+  buyer_id?: string;
+  seller_id?: string;
   books: {
     title: string;
     author: string;
@@ -265,7 +267,7 @@ export const Requests = () => {
               className="w-full"
               onClick={() => setSelectedReviewRequest({
                 requestId: request.id,
-                reviewedUserId: type === "sent" ? request.seller_profiles?.full_name || "Unknown" : request.buyer_profiles?.full_name || "Unknown",
+                reviewedUserId: type === "sent" ? request.seller_id! : request.buyer_id!,
                 reviewedUserName: type === "sent" ? request.seller_profiles?.full_name || "Seller" : request.buyer_profiles?.full_name || "Buyer",
                 bookTitle: request.books.title,
                 reviewType: type === "sent" ? "buyer_to_seller" : "seller_to_buyer"
@@ -375,6 +377,10 @@ export const Requests = () => {
           reviewedUserName={selectedReviewRequest.reviewedUserName}
           bookTitle={selectedReviewRequest.bookTitle}
           reviewType={selectedReviewRequest.reviewType}
+          onReviewSubmitted={() => {
+            setSelectedReviewRequest(null);
+            fetchRequests();
+          }}
         />
       )}
 
