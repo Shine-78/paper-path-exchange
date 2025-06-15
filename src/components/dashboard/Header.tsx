@@ -17,13 +17,22 @@ export const Header = ({ currentView, setCurrentView }: HeaderProps) => {
   const { playNotificationSound } = useNotificationSound();
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const fetchUnreadCount = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setUnreadCount(0);
+        return;
+      }
+
+      console.log('Fetching unread count for user:', user.id);
 
       const { data, error } = await supabase
         .from("notifications")
@@ -31,10 +40,17 @@ export const Header = ({ currentView, setCurrentView }: HeaderProps) => {
         .eq("user_id", user.id)
         .eq("read", false);
 
-      if (error) throw error;
-      setUnreadCount(data?.length || 0);
+      if (error) {
+        console.error('Error fetching unread count:', error);
+        throw error;
+      }
+      
+      const count = data?.length || 0;
+      console.log('Unread notification count:', count);
+      setUnreadCount(count);
     } catch (error) {
       console.error("Error fetching unread count:", error);
+      setUnreadCount(0);
     }
   };
 
@@ -49,6 +65,7 @@ export const Header = ({ currentView, setCurrentView }: HeaderProps) => {
         schema: 'public',
         table: 'notifications'
       }, (payload) => {
+        console.log('New notification in header:', payload);
         playNotificationSound();
         fetchUnreadCount();
       })
@@ -57,11 +74,23 @@ export const Header = ({ currentView, setCurrentView }: HeaderProps) => {
         schema: 'public',
         table: 'notifications'
       }, (payload) => {
+        console.log('Notification updated in header:', payload);
         fetchUnreadCount();
       })
-      .subscribe();
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'notifications'
+      }, (payload) => {
+        console.log('Notification deleted in header:', payload);
+        fetchUnreadCount();
+      })
+      .subscribe((status) => {
+        console.log('Header notification subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up header notification subscription');
       supabase.removeChannel(channel);
     };
   }, [playNotificationSound]);

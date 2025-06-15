@@ -69,15 +69,27 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
 
       console.log('Purchase request created successfully:', data);
 
-      // Create notification for seller
-      await supabase.from("notifications").insert({
-        user_id: book.seller_id,
-        type: 'purchase_request',
-        title: 'New Purchase Request',
-        message: `Someone wants to buy your book "${book.title}" for ₹${offeredPrice}`,
-        related_id: book.id,
-        priority: 'normal'
-      });
+      // Create notification for seller with better error handling
+      try {
+        const { error: notificationError } = await supabase.from("notifications").insert({
+          user_id: book.seller_id,
+          type: 'purchase_request',
+          title: 'New Purchase Request',
+          message: `Someone wants to buy your book "${book.title}" for ₹${offeredPrice}`,
+          related_id: book.id,
+          priority: 'normal'
+        });
+
+        if (notificationError) {
+          console.error('Error creating notification:', notificationError);
+          // Don't throw here, notification is not critical for purchase request
+        } else {
+          console.log('Seller notification created successfully');
+        }
+      } catch (notificationError) {
+        console.error('Notification creation failed:', notificationError);
+        // Continue with success flow
+      }
 
       toast({
         title: "Request sent!",

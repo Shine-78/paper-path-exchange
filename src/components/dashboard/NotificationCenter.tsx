@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +29,13 @@ export const NotificationCenter = () => {
   const fetchNotifications = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No user found, skipping notification fetch');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetching notifications for user:', user.id);
 
       const { data, error } = await supabase
         .from("notifications")
@@ -36,7 +43,12 @@ export const NotificationCenter = () => {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        throw error;
+      }
+      
+      console.log('Fetched notifications:', data?.length || 0);
       
       // Map data to ensure all properties are present with defaults
       const mappedNotifications: Notification[] = (data || []).map(notification => ({
@@ -45,14 +57,15 @@ export const NotificationCenter = () => {
         title: notification.title,
         message: notification.message,
         read: notification.read || false,
-        priority: (notification as any).priority || 'normal',
-        action_url: (notification as any).action_url,
+        priority: notification.priority || 'normal',
+        action_url: notification.action_url,
         created_at: notification.created_at || '',
         related_id: notification.related_id
       }));
       
       setNotifications(mappedNotifications);
     } catch (error: any) {
+      console.error('Error in fetchNotifications:', error);
       toast({
         title: "Error",
         description: "Failed to fetch notifications",
@@ -74,6 +87,7 @@ export const NotificationCenter = () => {
         schema: 'public',
         table: 'notifications'
       }, (payload) => {
+        console.log('New notification received:', payload);
         playNotificationSound();
         fetchNotifications();
       })
@@ -82,28 +96,49 @@ export const NotificationCenter = () => {
         schema: 'public',
         table: 'notifications'
       }, (payload) => {
+        console.log('Notification updated:', payload);
         fetchNotifications();
       })
-      .subscribe();
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'notifications'
+      }, (payload) => {
+        console.log('Notification deleted:', payload);
+        fetchNotifications();
+      })
+      .subscribe((status) => {
+        console.log('Notification subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up notification subscription');
       supabase.removeChannel(channel);
     };
   }, [playNotificationSound]);
 
   const markAsRead = async (notificationId: string) => {
     try {
+      console.log('Marking notification as read:', notificationId);
+      
       const { error } = await supabase
         .from("notifications")
         .update({ read: true })
         .eq("id", notificationId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        throw error;
+      }
 
+      // Update local state immediately for better UX
       setNotifications(notifications.map(n => 
         n.id === notificationId ? { ...n, read: true } : n
       ));
+
+      console.log('Notification marked as read successfully');
     } catch (error: any) {
+      console.error('Error in markAsRead:', error);
       toast({
         title: "Error",
         description: "Failed to mark notification as read",
@@ -114,15 +149,29 @@ export const NotificationCenter = () => {
 
   const deleteNotification = async (notificationId: string) => {
     try {
+      console.log('Deleting notification:', notificationId);
+      
       const { error } = await supabase
         .from("notifications")
         .delete()
         .eq("id", notificationId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting notification:', error);
+        throw error;
+      }
 
+      // Update local state immediately for better UX
       setNotifications(notifications.filter(n => n.id !== notificationId));
+      
+      console.log('Notification deleted successfully');
+      
+      toast({
+        title: "Notification deleted",
+        description: "Notification has been removed",
+      });
     } catch (error: any) {
+      console.error('Error in deleteNotification:', error);
       toast({
         title: "Error",
         description: "Failed to delete notification",
@@ -136,21 +185,30 @@ export const NotificationCenter = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      console.log('Marking all notifications as read for user:', user.id);
+
       const { error } = await supabase
         .from("notifications")
         .update({ read: true })
         .eq("user_id", user.id)
         .eq("read", false);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error marking all as read:', error);
+        throw error;
+      }
 
+      // Update local state immediately
       setNotifications(notifications.map(n => ({ ...n, read: true })));
+      
+      console.log('All notifications marked as read successfully');
       
       toast({
         title: "Success",
         description: "All notifications marked as read",
       });
     } catch (error: any) {
+      console.error('Error in markAllAsRead:', error);
       toast({
         title: "Error",
         description: "Failed to mark all as read",
@@ -241,6 +299,7 @@ export const NotificationCenter = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => markAsRead(notification.id)}
+                        title="Mark as read"
                       >
                         <Check className="h-4 w-4" />
                       </Button>
@@ -249,6 +308,7 @@ export const NotificationCenter = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => deleteNotification(notification.id)}
+                      title="Delete notification"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
