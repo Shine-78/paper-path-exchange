@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,11 +20,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Circle, User, Book, MapPin } from "lucide-react";
+import { CheckCircle, Circle, User, Book, MapPin, MessageSquare, Package, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BookRouteMap } from "./BookRouteMap";
 import { LeafletBookRouteMap } from "./LeafletBookRouteMap";
+import { ChatModal } from "./ChatModal";
+import { DeliveryConfirmationModal } from "./DeliveryConfirmationModal";
+import { DeliveryDateSelector } from "./DeliveryDateSelector";
 
 interface PurchaseRequest {
   id: string;
@@ -32,6 +36,7 @@ interface PurchaseRequest {
   seller_id: string;
   status: 'pending' | 'accepted' | 'rejected' | 'completed';
   created_at: string;
+  expected_delivery_date?: string;
   book_title?: string;
   book_price?: number;
   buyer_name?: string;
@@ -45,6 +50,9 @@ interface PurchaseRequest {
 export const Requests = (props) => {
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRequestForChat, setSelectedRequestForChat] = useState<string | null>(null);
+  const [selectedRequestForDelivery, setSelectedRequestForDelivery] = useState<string | null>(null);
+  const [selectedRequestForDate, setSelectedRequestForDate] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchRequests = async () => {
@@ -53,7 +61,7 @@ export const Requests = (props) => {
       const { data, error } = await supabase
         .from("purchase_requests")
         .select(`
-          id, book_id, buyer_id, seller_id, status, created_at,
+          id, book_id, buyer_id, seller_id, status, created_at, expected_delivery_date,
           books (title, price_range),
           buyer_profile:profiles!buyer_id (full_name, location_address, latitude, longitude)
         `)
@@ -69,6 +77,7 @@ export const Requests = (props) => {
         seller_id: request.seller_id,
         status: request.status as 'pending' | 'accepted' | 'rejected' | 'completed',
         created_at: request.created_at,
+        expected_delivery_date: request.expected_delivery_date,
         book_title: request.books?.title,
         book_price: request.books?.price_range,
         buyer_name: request.buyer_profile?.full_name,
@@ -107,7 +116,7 @@ export const Requests = (props) => {
 
       toast({
         title: "Success",
-        description: "Request accepted successfully",
+        description: "Request accepted successfully. You can now set delivery date and coordinate with the buyer.",
       });
       fetchRequests();
     } catch (error: any) {
@@ -137,6 +146,31 @@ export const Requests = (props) => {
       toast({
         title: "Error",
         description: "Failed to reject request",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeliveryDateSet = async (requestId: string, date: string) => {
+    try {
+      const { error } = await supabase
+        .from("purchase_requests")
+        .update({ expected_delivery_date: date })
+        .eq("id", requestId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Delivery date set successfully",
+      });
+      
+      setSelectedRequestForDate(null);
+      fetchRequests();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to set delivery date",
         variant: "destructive",
       });
     }
@@ -187,38 +221,90 @@ export const Requests = (props) => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex flex-col gap-2">
+                            {/* Primary Actions for Pending Requests */}
                             {request.status === 'pending' && (
                               <div className="space-x-2">
                                 <Button size="sm" onClick={() => handleAcceptRequest(request.id)}>Accept</Button>
                                 <Button variant="outline" size="sm" onClick={() => handleRejectRequest(request.id)}>Reject</Button>
                               </div>
                             )}
-                            <Dialog>
-                              <DialogTrigger asChild>
+
+                            {/* Secondary Actions for Accepted/Completed Requests */}
+                            {(request.status === 'accepted' || request.status === 'completed') && (
+                              <div className="flex flex-wrap gap-1">
+                                {/* Chat Button */}
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  disabled={!canShowMap}
-                                  className="bg-purple-600 text-white hover:bg-purple-700"
+                                  onClick={() => setSelectedRequestForChat(request.id)}
+                                  className="bg-blue-600 text-white hover:bg-blue-700"
                                 >
-                                  <MapPin className="w-4 h-4 mr-2" />
-                                  View Map
+                                  <MessageSquare className="w-4 h-4 mr-1" />
+                                  Chat
                                 </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-2xl">
-                                <DialogHeader>
-                                  <DialogTitle>Buyer & Seller Locations</DialogTitle>
-                                </DialogHeader>
-                                {canShowMap && (
-                                  <div className="mt-4">
-                                    <LeafletBookRouteMap
-                                      buyer={buyer}
-                                      seller={seller}
-                                    />
-                                  </div>
+
+                                {/* Set Delivery Date (only if accepted and no date set) */}
+                                {request.status === 'accepted' && !request.expected_delivery_date && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setSelectedRequestForDate(request.id)}
+                                    className="bg-orange-600 text-white hover:bg-orange-700"
+                                  >
+                                    <Calendar className="w-4 h-4 mr-1" />
+                                    Set Date
+                                  </Button>
                                 )}
-                              </DialogContent>
-                            </Dialog>
+
+                                {/* Delivery Confirmation (only if accepted and date is set) */}
+                                {request.status === 'accepted' && request.expected_delivery_date && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setSelectedRequestForDelivery(request.id)}
+                                    className="bg-green-600 text-white hover:bg-green-700"
+                                  >
+                                    <Package className="w-4 h-4 mr-1" />
+                                    Delivery
+                                  </Button>
+                                )}
+
+                                {/* View Map */}
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={!canShowMap}
+                                      className="bg-purple-600 text-white hover:bg-purple-700"
+                                    >
+                                      <MapPin className="w-4 h-4 mr-1" />
+                                      Map
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-4xl max-h-[90vh]">
+                                    <DialogHeader>
+                                      <DialogTitle>Buyer & Seller Locations</DialogTitle>
+                                    </DialogHeader>
+                                    {canShowMap && (
+                                      <div className="mt-4">
+                                        <LeafletBookRouteMap
+                                          buyer={buyer}
+                                          seller={seller}
+                                        />
+                                      </div>
+                                    )}
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
+                            )}
+
+                            {/* Status Info */}
+                            {request.expected_delivery_date && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Expected: {new Date(request.expected_delivery_date).toLocaleDateString()}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -230,6 +316,43 @@ export const Requests = (props) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Chat Modal */}
+      {selectedRequestForChat && (
+        <ChatModal
+          isOpen={!!selectedRequestForChat}
+          onClose={() => setSelectedRequestForChat(null)}
+          requestId={selectedRequestForChat}
+          currentUserId={props.userId}
+        />
+      )}
+
+      {/* Delivery Confirmation Modal */}
+      {selectedRequestForDelivery && (
+        <DeliveryConfirmationModal
+          isOpen={!!selectedRequestForDelivery}
+          onClose={() => setSelectedRequestForDelivery(null)}
+          purchaseRequestId={selectedRequestForDelivery}
+          userType="seller"
+          bookTitle={requests.find(r => r.id === selectedRequestForDelivery)?.book_title || ""}
+          bookPrice={requests.find(r => r.id === selectedRequestForDelivery)?.book_price || 0}
+        />
+      )}
+
+      {/* Delivery Date Selector Modal */}
+      {selectedRequestForDate && (
+        <Dialog open={!!selectedRequestForDate} onOpenChange={() => setSelectedRequestForDate(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Set Expected Delivery Date</DialogTitle>
+            </DialogHeader>
+            <DeliveryDateSelector
+              onDateSelect={(date) => handleDeliveryDateSet(selectedRequestForDate, date)}
+              onCancel={() => setSelectedRequestForDate(null)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
