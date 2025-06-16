@@ -1,3 +1,4 @@
+
 import React from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -125,6 +126,15 @@ export const LeafletBookRouteMap: React.FC<LeafletBookRouteMapProps> = ({
   ];
   
   const distance = haversineDistance(
+    buyer.latitude,
+    buyer.longitude,
+    seller.latitude,
+    seller.longitude
+  );
+
+  // Calculate travel time and direction
+  const travelTime = estimateTravelTime(distance);
+  const direction = getDirection(
     buyer.latitude,
     buyer.longitude,
     seller.latitude,
