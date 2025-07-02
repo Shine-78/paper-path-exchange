@@ -27,19 +27,23 @@ export class LocationService {
 
   public async getCurrentLocation(): Promise<LocationData> {
     return new Promise((resolve, reject) => {
+      console.log('Starting location request...');
+      
       if (!navigator.geolocation) {
-        reject({
+        const error = {
           code: 0,
-          message: 'Geolocation is not supported by this browser. Please use a modern browser that supports location services.'
-        });
+          message: 'Geolocation is not supported by this browser. Please use a modern browser or enable location services.'
+        };
+        console.error('Geolocation not supported:', error);
+        reject(error);
         return;
       }
 
-      // Check if we have a recent cached location (less than 5 minutes old)
+      // Check if we have a recent cached location (less than 2 minutes old)
       if (this.currentLocation && this.currentLocation.timestamp) {
-        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-        if (this.currentLocation.timestamp > fiveMinutesAgo) {
-          console.log('Using recent cached location');
+        const twoMinutesAgo = Date.now() - (2 * 60 * 1000);
+        if (this.currentLocation.timestamp > twoMinutesAgo) {
+          console.log('Using recent cached location:', this.currentLocation);
           resolve(this.currentLocation);
           return;
         }
@@ -47,26 +51,36 @@ export class LocationService {
 
       const options: PositionOptions = {
         enableHighAccuracy: true,
-        timeout: 15000, // Increased timeout
-        maximumAge: 300000 // 5 minutes
+        timeout: 20000, // 20 seconds timeout
+        maximumAge: 120000 // 2 minutes cache
       };
 
-      console.log('Requesting current location with options:', options);
+      console.log('Requesting GPS location with options:', options);
 
       const successCallback = (position: GeolocationPosition) => {
-        console.log('Location success:', position);
+        console.log('GPS location success:', {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+        
         const location: LocationData = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           accuracy: position.coords.accuracy,
           timestamp: Date.now()
         };
+        
         this.currentLocation = location;
         resolve(location);
       };
 
       const errorCallback = (error: GeolocationPositionError) => {
-        console.error('Location error:', error);
+        console.error('GPS location error:', {
+          code: error.code,
+          message: error.message
+        });
+        
         const locationError: LocationError = {
           code: error.code,
           message: this.getErrorMessage(error.code)
@@ -74,22 +88,31 @@ export class LocationService {
         reject(locationError);
       };
 
-      navigator.geolocation.getCurrentPosition(
-        successCallback,
-        errorCallback,
-        options
-      );
+      // Request location with proper error handling
+      try {
+        navigator.geolocation.getCurrentPosition(
+          successCallback,
+          errorCallback,
+          options
+        );
+      } catch (e) {
+        console.error('Exception during location request:', e);
+        reject({
+          code: -1,
+          message: 'Failed to request location. Please try again.'
+        });
+      }
     });
   }
 
   public getCachedLocation(): LocationData | null {
-    // Check if cached location is still valid (less than 10 minutes old)
+    // Check if cached location is still valid (less than 5 minutes old)
     if (this.currentLocation && this.currentLocation.timestamp) {
-      const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-      if (this.currentLocation.timestamp > tenMinutesAgo) {
+      const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+      if (this.currentLocation.timestamp > fiveMinutesAgo) {
         return this.currentLocation;
       } else {
-        console.log('Cached location is too old, clearing it');
+        console.log('Cached location expired, clearing it');
         this.currentLocation = null;
       }
     }
@@ -97,6 +120,7 @@ export class LocationService {
   }
 
   public clearCachedLocation(): void {
+    console.log('Clearing cached location');
     this.currentLocation = null;
     if (this.locationWatchId !== null) {
       navigator.geolocation.clearWatch(this.locationWatchId);
@@ -107,23 +131,13 @@ export class LocationService {
   private getErrorMessage(code: number): string {
     switch (code) {
       case 1:
-        return 'Location access was denied. Please enable location permissions in your browser settings and try again.';
+        return 'Location access denied. Please allow location access in your browser settings and try again.';
       case 2:
-        return 'Your location could not be determined. Please check your internet connection and GPS settings.';
+        return 'Location unavailable. Please check your GPS/internet connection and try again.';
       case 3:
-        return 'Location request timed out. Please try again or check your internet connection.';
+        return 'Location request timeout. Please try again with a stable connection.';
       default:
-        return 'An unknown error occurred while getting your location. Please try again.';
-    }
-  }
-
-  public async requestLocationPermission(): Promise<LocationData> {
-    try {
-      console.log('Requesting location permission...');
-      return await this.getCurrentLocation();
-    } catch (error) {
-      console.error('Location permission request failed:', error);
-      throw error;
+        return 'Unable to get your location. Please try again or enter your address manually.';
     }
   }
 
@@ -135,6 +149,7 @@ export class LocationService {
     if ('permissions' in navigator) {
       try {
         const permission = await navigator.permissions.query({ name: 'geolocation' });
+        console.log('Location permission status:', permission.state);
         return permission.state;
       } catch (error) {
         console.log('Permission query not supported:', error);
@@ -143,50 +158,6 @@ export class LocationService {
     }
 
     return 'prompt';
-  }
-
-  public startWatchingLocation(callback: (location: LocationData) => void, errorCallback?: (error: LocationError) => void): void {
-    if (!navigator.geolocation) {
-      errorCallback?.({
-        code: 0,
-        message: 'Geolocation is not supported by this browser'
-      });
-      return;
-    }
-
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 60000 // 1 minute
-    };
-
-    this.locationWatchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const location: LocationData = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: Date.now()
-        };
-        this.currentLocation = location;
-        callback(location);
-      },
-      (error) => {
-        const locationError: LocationError = {
-          code: error.code,
-          message: this.getErrorMessage(error.code)
-        };
-        errorCallback?.(locationError);
-      },
-      options
-    );
-  }
-
-  public stopWatchingLocation(): void {
-    if (this.locationWatchId !== null) {
-      navigator.geolocation.clearWatch(this.locationWatchId);
-      this.locationWatchId = null;
-    }
   }
 }
 

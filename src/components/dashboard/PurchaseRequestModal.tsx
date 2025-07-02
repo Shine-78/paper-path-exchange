@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MapPin, AlertCircle } from "lucide-react";
+import { MapPin, AlertCircle, Loader2, CheckCircle } from "lucide-react";
 import { locationService, LocationData } from "@/services/locationService";
 
 interface Book {
@@ -42,35 +42,49 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if we have cached location on modal open
     if (isOpen) {
       const cachedLocation = locationService.getCachedLocation();
       if (cachedLocation) {
         setBuyerLocation(cachedLocation);
         console.log('Using cached buyer location:', cachedLocation);
       }
+      // Reset error when modal opens
+      setLocationError(null);
     }
   }, [isOpen]);
 
   const handleGetLocation = async () => {
+    console.log('Get location button clicked');
     setLocationLoading(true);
     setLocationError(null);
     
     try {
+      // Check permission status first
+      const permissionStatus = await locationService.checkPermissionStatus();
+      console.log('Permission status:', permissionStatus);
+      
+      if (permissionStatus === 'denied') {
+        throw new Error('Location access is denied. Please enable location permissions in your browser settings.');
+      }
+
+      console.log('Requesting current location...');
       const location = await locationService.getCurrentLocation();
+      console.log('Location received:', location);
+      
       setBuyerLocation(location);
       
       toast({
-        title: "Location Captured",
-        description: "Your location has been captured successfully.",
+        title: "Location Captured Successfully",
+        description: `Your location has been captured with ${location.accuracy ? `±${Math.round(location.accuracy)}m accuracy` : 'good accuracy'}.`,
       });
     } catch (error: any) {
-      console.error('Location error:', error);
-      setLocationError(error.message || "Failed to get location");
+      console.error('Location error details:', error);
+      const errorMessage = error.message || "Failed to get your location";
+      setLocationError(errorMessage);
       
       toast({
         title: "Location Error",
-        description: error.message || "Failed to get your location. Please enter your address manually.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -85,7 +99,7 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
     if (!buyerLocation && !locationAddress.trim()) {
       toast({
         title: "Location Required",
-        description: "Please provide your location either by GPS or entering your address.",
+        description: "Please provide your location using GPS or enter your address manually.",
         variant: "destructive",
       });
       return;
@@ -95,10 +109,11 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!user) throw new Error("Please log in to send a purchase request");
 
       // Update buyer's profile with location if GPS location is available
       if (buyerLocation) {
+        console.log('Updating buyer profile with GPS location:', buyerLocation);
         const { error: profileError } = await supabase
           .from("profiles")
           .update({
@@ -113,6 +128,7 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
         }
       } else if (locationAddress.trim()) {
         // Update profile with just the address if no GPS location
+        console.log('Updating buyer profile with address only');
         const { error: profileError } = await supabase
           .from("profiles")
           .update({
@@ -125,15 +141,7 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
         }
       }
 
-      console.log('Submitting purchase request with data:', {
-        book_id: book.id,
-        buyer_id: user.id,
-        seller_id: book.seller_id,
-        offered_price: offeredPrice,
-        transfer_mode: transferMode,
-        message: message || null,
-      });
-
+      console.log('Creating purchase request...');
       const { data, error } = await supabase.from("purchase_requests").insert({
         book_id: book.id,
         buyer_id: user.id,
@@ -154,10 +162,10 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
       // Create notification for seller with location info
       try {
         const locationInfo = buyerLocation 
-          ? `Location: ${buyerLocation.latitude.toFixed(4)}, ${buyerLocation.longitude.toFixed(4)}`
+          ? `GPS Location: ${buyerLocation.latitude.toFixed(4)}, ${buyerLocation.longitude.toFixed(4)}`
           : locationAddress.trim() ? `Address: ${locationAddress.trim()}` : '';
         
-        const notificationMessage = `Someone wants to buy your book "${book.title}" for ₹${offeredPrice}. ${locationInfo}`;
+        const notificationMessage = `New purchase request for "${book.title}" - Offer: ₹${offeredPrice}. ${locationInfo}`;
 
         const { error: notificationError } = await supabase.from("notifications").insert({
           user_id: book.seller_id,
@@ -170,15 +178,13 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
 
         if (notificationError) {
           console.error('Error creating notification:', notificationError);
-        } else {
-          console.log('Seller notification created successfully');
         }
       } catch (notificationError) {
         console.error('Notification creation failed:', notificationError);
       }
 
       toast({
-        title: "Request sent!",
+        title: "Request Sent Successfully!",
         description: "Your purchase request with location has been sent to the seller.",
       });
 
@@ -277,75 +283,95 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
               </RadioGroup>
             </div>
 
-            {/* Location Section */}
-            <div className="space-y-3 p-4 bg-blue-50 rounded-lg border">
+            {/* Enhanced Location Section */}
+            <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-blue-600" />
-                <Label className="font-medium text-blue-900">Your Location (Required)</Label>
+                <MapPin className="h-5 w-5 text-blue-600" />
+                <Label className="font-semibold text-blue-900">Your Location (Required)</Label>
               </div>
               
               <p className="text-sm text-blue-700">
-                The seller needs your location to estimate delivery feasibility.
+                Please provide your location so the seller can estimate delivery feasibility and calculate distance.
               </p>
 
-              {/* GPS Location */}
-              <div className="space-y-2">
+              {/* GPS Location Section */}
+              <div className="space-y-3">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleGetLocation}
                   disabled={locationLoading}
-                  className="w-full"
+                  className="w-full h-12 text-base font-medium"
                 >
                   {locationLoading ? (
                     <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                      Getting Location...
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Getting Your Location...
+                    </div>
+                  ) : buyerLocation ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Update GPS Location
                     </div>
                   ) : (
-                    <>
-                      <MapPin className="h-4 w-4 mr-2" />
-                      {buyerLocation ? "Update GPS Location" : "Get My GPS Location"}
-                    </>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Get My GPS Location
+                    </div>
                   )}
                 </Button>
 
+                {/* Location Status Display */}
                 {buyerLocation && (
-                  <div className="text-sm text-green-700 bg-green-50 p-2 rounded">
-                    ✓ GPS Location captured: {buyerLocation.latitude.toFixed(4)}, {buyerLocation.longitude.toFixed(4)}
-                    {buyerLocation.accuracy && ` (±${Math.round(buyerLocation.accuracy)}m)`}
+                  <div className="text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="font-medium">GPS Location Captured Successfully</span>
+                    </div>
+                    <p>Coordinates: {buyerLocation.latitude.toFixed(6)}, {buyerLocation.longitude.toFixed(6)}</p>
+                    {buyerLocation.accuracy && (
+                      <p>Accuracy: ±{Math.round(buyerLocation.accuracy)} meters</p>
+                    )}
                   </div>
                 )}
 
                 {locationError && (
-                  <div className="text-sm text-red-700 bg-red-50 p-2 rounded flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    {locationError}
+                  <div className="text-sm text-red-700 bg-red-50 p-3 rounded-lg border border-red-200 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Location Error</p>
+                      <p>{locationError}</p>
+                      <p className="mt-1 text-xs">Please try again or enter your address below.</p>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Manual Address */}
-              <div>
-                <Label htmlFor="locationAddress">Or Enter Your Address</Label>
+              {/* Manual Address Section */}
+              <div className="space-y-2">
+                <Label htmlFor="locationAddress" className="text-sm font-medium">
+                  Or Enter Your Address Manually
+                </Label>
                 <Textarea
                   id="locationAddress"
-                  placeholder="Enter your full address (street, area, city, pincode)"
+                  placeholder="Enter your complete address (street, area, city, pincode)..."
                   value={locationAddress}
                   onChange={(e) => setLocationAddress(e.target.value)}
-                  rows={2}
+                  rows={3}
+                  className="resize-none"
                 />
               </div>
 
+              {/* Validation Message */}
               {!buyerLocation && !locationAddress.trim() && (
-                <p className="text-sm text-red-600">
-                  Please provide either GPS location or your address.
-                </p>
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                  <strong>Required:</strong> Please provide either GPS location or your address.
+                </div>
               )}
             </div>
 
             <div>
-              <Label htmlFor="message">Message (Optional)</Label>
+              <Label htmlFor="message">Message to Seller (Optional)</Label>
               <Textarea
                 id="message"
                 placeholder="Add a message to the seller..."
@@ -360,7 +386,14 @@ export const PurchaseRequestModal = ({ book, isOpen, onClose }: PurchaseRequestM
                 Cancel
               </Button>
               <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? "Sending..." : "Send Request"}
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sending...
+                  </div>
+                ) : (
+                  "Send Request"
+                )}
               </Button>
             </div>
           </form>
