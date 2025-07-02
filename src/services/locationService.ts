@@ -25,6 +25,10 @@ export class LocationService {
     return LocationService.instance;
   }
 
+  public async requestLocationPermission(): Promise<LocationData> {
+    return this.getCurrentLocation();
+  }
+
   public async getCurrentLocation(): Promise<LocationData> {
     return new Promise((resolve, reject) => {
       console.log('Starting location request...');
