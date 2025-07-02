@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { DashboardView } from "@/types/dashboard";
 import { useState, useEffect } from "react";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuItem, Avatar, AvatarImage, AvatarFallback } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface HeaderProps {
   currentView: DashboardView;
