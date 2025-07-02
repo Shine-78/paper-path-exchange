@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Circle, User, Book, MapPin, MessageSquare, Package, Calendar } from "lucide-react";
+import { CheckCircle, Circle, User, Book, MapPin, MessageSquare, Package, Calendar, Navigation } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BookRouteMap } from "./BookRouteMap";
@@ -45,6 +45,9 @@ interface PurchaseRequest {
   buyer_longitude?: number;
   seller_latitude?: number;
   seller_longitude?: number;
+  offered_price?: number;
+  transfer_mode?: string;
+  message?: string;
 }
 
 export const Requests = (props) => {
@@ -62,6 +65,7 @@ export const Requests = (props) => {
         .from("purchase_requests")
         .select(`
           id, book_id, buyer_id, seller_id, status, created_at, expected_delivery_date,
+          offered_price, transfer_mode, message,
           books (title, price_range),
           buyer_profile:profiles!buyer_id (full_name, location_address, latitude, longitude)
         `)
@@ -86,6 +90,9 @@ export const Requests = (props) => {
         buyer_longitude: request.buyer_profile?.longitude,
         seller_latitude: props.userProfile?.latitude,
         seller_longitude: props.userProfile?.longitude,
+        offered_price: request.offered_price,
+        transfer_mode: request.transfer_mode,
+        message: request.message,
       }));
 
       setRequests(enrichedRequests);
@@ -176,6 +183,19 @@ export const Requests = (props) => {
     }
   };
 
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    return Math.round(distance * 10) / 10; // Round to 1 decimal place
+  };
+
   return (
     <div>
       <Card>
@@ -190,9 +210,9 @@ export const Requests = (props) => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[150px]">Book</TableHead>
-                    <TableHead>Buyer</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead className="w-[200px]">Book & Buyer</TableHead>
+                    <TableHead>Location & Distance</TableHead>
+                    <TableHead>Offer Details</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -207,18 +227,62 @@ export const Requests = (props) => {
                       : null;
                     
                     const canShowMap = buyer && seller;
+                    const distance = canShowMap 
+                      ? calculateDistance(buyer.latitude, buyer.longitude, seller.latitude, seller.longitude)
+                      : null;
                     
                     return (
                       <TableRow key={request.id}>
-                        <TableCell className="font-medium">{request.book_title}</TableCell>
-                        <TableCell>{request.buyer_name}</TableCell>
-                        <TableCell>{new Date(request.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium">{request.book_title}</div>
+                            <div className="text-sm text-gray-600 flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {request.buyer_name}
+                            </div>
+                            <div className="text-xs text-gray-500">{new Date(request.created_at).toLocaleDateString()}</div>
+                          </div>
+                        </TableCell>
+                        
+                        <TableCell>
+                          <div className="space-y-1">
+                            {request.buyer_location && (
+                              <div className="text-sm flex items-start gap-1">
+                                <MapPin className="h-3 w-3 mt-0.5 text-gray-500" />
+                                <span className="text-gray-600">{request.buyer_location}</span>
+                              </div>
+                            )}
+                            {distance && (
+                              <div className="text-sm flex items-center gap-1">
+                                <Navigation className="h-3 w-3 text-blue-500" />
+                                <span className="text-blue-600 font-medium">{distance} km away</span>
+                              </div>
+                            )}
+                            {!request.buyer_location && !buyer && (
+                              <div className="text-sm text-gray-400">No location provided</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium text-green-600">₹{request.offered_price}</div>
+                            <div className="text-sm text-gray-600 capitalize">{request.transfer_mode?.replace('-', ' ')}</div>
+                            {request.message && (
+                              <div className="text-xs text-gray-500 italic max-w-32 truncate" title={request.message}>
+                                "{request.message}"
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        
                         <TableCell>
                           {request.status === 'pending' && <Badge variant="secondary">Pending</Badge>}
                           {request.status === 'accepted' && <Badge className="bg-green-100 text-green-800 border-0">Accepted</Badge>}
                           {request.status === 'rejected' && <Badge className="bg-red-100 text-red-800 border-0">Rejected</Badge>}
                           {request.status === 'completed' && <Badge className="bg-blue-100 text-blue-800 border-0">Completed</Badge>}
                         </TableCell>
+                        
                         <TableCell className="text-right">
                           <div className="flex flex-col gap-2">
                             {/* Primary Actions for Pending Requests */}
@@ -276,7 +340,7 @@ export const Requests = (props) => {
                                       variant="outline"
                                       size="sm"
                                       disabled={!canShowMap}
-                                      className="bg-purple-600 text-white hover:bg-purple-700"
+                                      className="bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-300"
                                     >
                                       <MapPin className="w-4 h-4 mr-1" />
                                       Map
