@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import { Header } from "./Header";
@@ -7,6 +8,7 @@ import { BookDiscovery } from "./BookDiscovery";
 import { SellBook } from "./SellBook";
 import { MyBooks } from "./MyBooks";
 import { Requests } from "./Requests";
+import { MyRequests } from "./MyRequests";
 import { Profile } from "./Profile";
 import { NotificationCenter } from "./NotificationCenter";
 import { AdminDashboard } from "./AdminDashboard";
@@ -111,8 +113,11 @@ export const Dashboard = ({ user }: DashboardProps) => {
       case "my-books":
         return <MyBooks />;
       case "requests":
-        // Pass userId and userProfile as props
+        // Show seller requests (books they're selling)
         return <Requests userId={user?.id} userProfile={userProfile} />;
+      case "my-requests":
+        // Show buyer requests (books they want to buy)
+        return <MyRequests userId={user?.id} userProfile={userProfile} />;
       case "profile":
         return <Profile user={user} />;
       case "notifications":

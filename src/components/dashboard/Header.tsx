@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { DashboardView } from "@/types/dashboard";
 import { useState, useEffect } from "react";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuItem, Avatar, AvatarImage, AvatarFallback } from "@/components/ui/dropdown-menu";
 
 interface HeaderProps {
   currentView: DashboardView;
@@ -106,62 +107,139 @@ export const Header = ({ currentView, setCurrentView, isAdmin }: HeaderProps) =>
   return (
     <header className="bg-white shadow-sm border-b">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center">
-            <BookOpen className="h-8 w-8 text-blue-600 mr-2" />
-            <h1 className="text-2xl font-bold text-gray-900">BookEx</h1>
+        <div className="flex items-center justify-between py-4">
+          <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-2">
+              <BookOpen className="h-6 w-6 text-blue-600" />
+              <span className="text-xl font-bold text-gray-900">BookMarket</span>
+            </div>
+            
+            <nav className="hidden md:flex space-x-6">
+              <button
+                onClick={() => setCurrentView("discover")}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentView === "discover"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Discover
+              </button>
+              <button
+                onClick={() => setCurrentView("sell")}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentView === "sell"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Sell Book
+              </button>
+              <button
+                onClick={() => setCurrentView("my-books")}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentView === "my-books"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                My Books
+              </button>
+              <button
+                onClick={() => setCurrentView("requests")}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentView === "requests"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Sell Requests
+              </button>
+              <button
+                onClick={() => setCurrentView("my-requests")}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentView === "my-requests"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                My Requests
+              </button>
+              <button
+                onClick={() => setCurrentView("transactions")}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentView === "transactions"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Transactions
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setCurrentView("admin")}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    currentView === "admin"
+                      ? "bg-red-100 text-red-700"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Admin
+                </button>
+              )}
+            </nav>
           </div>
 
-          {/* Navigation */}
-          <nav className="hidden md:flex space-x-1">
-            {navItems.map(({ id, label, icon: Icon }) => (
-              <Button
-                key={id}
-                variant={currentView === id ? "default" : "ghost"}
-                onClick={() => setCurrentView(id as DashboardView)}
-                className="flex items-center space-x-2"
+          <div className="flex items-center space-x-4">
+            {/* Notification Bell */}
+            <div className="relative">
+              <button
+                onClick={() => setCurrentView("notifications")}
+                className={`p-2 rounded-full transition-colors ${
+                  currentView === "notifications"
+                    ? "bg-blue-100 text-blue-700"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                }`}
               >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </Button>
-            ))}
-            
-            {/* Admin Dashboard Button - Only visible to admins */}
-            {isAdmin && (
-              <Button
-                variant={currentView === "admin" ? "default" : "ghost"}
-                onClick={() => setCurrentView("admin")}
-                className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700"
-              >
-                <Shield className="h-4 w-4" />
-                <span>Admin</span>
-              </Button>
-            )}
-          </nav>
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
 
-          {/* Right side actions */}
-          <div className="flex items-center space-x-2">
-            <Button
-              variant={currentView === "notifications" ? "default" : "ghost"}
-              onClick={() => setCurrentView("notifications")}
-              className="relative"
-            >
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <Badge 
-                  className="absolute -top-2 -right-2 bg-red-500 text-white text-xs min-w-[1.25rem] h-5 flex items-center justify-center rounded-full animate-pulse"
-                >
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </Badge>
-              )}
-              <span className="hidden sm:inline ml-2">Notifications</span>
-            </Button>
-            
-            <Button variant="outline" onClick={handleSignOut} className="flex items-center space-x-2">
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </Button>
+            {/* Profile Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="" alt="" />
+                    <AvatarFallback>
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">Account</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setCurrentView("profile")}>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -187,9 +265,9 @@ export const Header = ({ currentView, setCurrentView, isAdmin }: HeaderProps) =>
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
                 <Badge 
-                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[1rem] h-4 flex items-center justify-center rounded-full"
+                  className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center"
                 >
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {unreadCount > 9 ? '9+' : unreadCount}
                 </Badge>
               )}
               <span className="text-xs">Alerts</span>

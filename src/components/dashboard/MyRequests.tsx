@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,24 +12,20 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Circle, User, Book, MapPin, MessageSquare, Package, Calendar, Navigation, AlertCircle } from "lucide-react";
+import { User, Book, MapPin, MessageSquare, Package, Calendar, Navigation, AlertCircle, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { BookRouteMap } from "./BookRouteMap";
 import { LeafletBookRouteMap } from "./LeafletBookRouteMap";
 import { ChatModal } from "./ChatModal";
 import { DeliveryConfirmationModal } from "./DeliveryConfirmationModal";
-import { DeliveryDateSelector } from "./DeliveryDateSelector";
 
-interface PurchaseRequest {
+interface BuyerRequest {
   id: string;
   book_id: string;
   buyer_id: string;
@@ -38,28 +35,32 @@ interface PurchaseRequest {
   expected_delivery_date?: string;
   book_title?: string;
   book_price?: number;
-  buyer_name?: string;
-  buyer_location?: string;
-  buyer_latitude?: number;
-  buyer_longitude?: number;
+  seller_name?: string;
+  seller_location?: string;
   seller_latitude?: number;
   seller_longitude?: number;
+  buyer_latitude?: number;
+  buyer_longitude?: number;
   offered_price?: number;
   transfer_mode?: string;
   message?: string;
 }
 
-export const Requests = (props) => {
-  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+interface MyRequestsProps {
+  userId?: string;
+  userProfile?: any;
+}
+
+export const MyRequests = ({ userId, userProfile }: MyRequestsProps) => {
+  const [requests, setRequests] = useState<BuyerRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRequestForChat, setSelectedRequestForChat] = useState<string | null>(null);
   const [selectedRequestForDelivery, setSelectedRequestForDelivery] = useState<string | null>(null);
-  const [selectedRequestForDate, setSelectedRequestForDate] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchRequests = async () => {
-    if (!props.userId) {
+  const fetchMyRequests = async () => {
+    if (!userId) {
       setError("User ID not provided");
       setLoading(false);
       return;
@@ -69,7 +70,7 @@ export const Requests = (props) => {
     setError(null);
     
     try {
-      console.log('Fetching requests for user:', props.userId);
+      console.log('Fetching buyer requests for user:', userId);
       
       const { data, error } = await supabase
         .from("purchase_requests")
@@ -77,19 +78,19 @@ export const Requests = (props) => {
           id, book_id, buyer_id, seller_id, status, created_at, expected_delivery_date,
           offered_price, transfer_mode, message,
           books (title, price_range),
-          buyer_profile:profiles!buyer_id (full_name, location_address, latitude, longitude)
+          seller_profile:profiles!seller_id (full_name, location_address, latitude, longitude)
         `)
-        .eq("seller_id", props.userId)
+        .eq("buyer_id", userId)
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error('Error fetching requests:', error);
+        console.error('Error fetching buyer requests:', error);
         throw error;
       }
 
-      console.log('Fetched requests data:', data);
+      console.log('Fetched buyer requests data:', data);
 
-      const enrichedRequests: PurchaseRequest[] = data?.map(request => ({
+      const enrichedRequests: BuyerRequest[] = data?.map(request => ({
         id: request.id,
         book_id: request.book_id,
         buyer_id: request.buyer_id,
@@ -99,25 +100,25 @@ export const Requests = (props) => {
         expected_delivery_date: request.expected_delivery_date,
         book_title: request.books?.title,
         book_price: request.books?.price_range,
-        buyer_name: request.buyer_profile?.full_name,
-        buyer_location: request.buyer_profile?.location_address,
-        buyer_latitude: request.buyer_profile?.latitude,
-        buyer_longitude: request.buyer_profile?.longitude,
-        seller_latitude: props.userProfile?.latitude,
-        seller_longitude: props.userProfile?.longitude,
+        seller_name: request.seller_profile?.full_name,
+        seller_location: request.seller_profile?.location_address,
+        seller_latitude: request.seller_profile?.latitude,
+        seller_longitude: request.seller_profile?.longitude,
+        buyer_latitude: userProfile?.latitude,
+        buyer_longitude: userProfile?.longitude,
         offered_price: request.offered_price,
         transfer_mode: request.transfer_mode,
         message: request.message,
       })) || [];
 
-      console.log('Enriched requests:', enrichedRequests);
+      console.log('Enriched buyer requests:', enrichedRequests);
       setRequests(enrichedRequests);
     } catch (error: any) {
-      console.error('Error fetching purchase requests:', error);
-      setError(error.message || "Failed to fetch purchase requests");
+      console.error('Error fetching buyer requests:', error);
+      setError(error.message || "Failed to fetch your requests");
       toast({
         title: "Error",
-        description: "Failed to fetch purchase requests",
+        description: "Failed to fetch your purchase requests",
         variant: "destructive",
       });
     } finally {
@@ -126,79 +127,8 @@ export const Requests = (props) => {
   };
 
   useEffect(() => {
-    fetchRequests();
-  }, [props.userId]);
-
-  const handleAcceptRequest = async (requestId: string) => {
-    try {
-      const { error } = await supabase
-        .from("purchase_requests")
-        .update({ status: "accepted" })
-        .eq("id", requestId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Request accepted successfully. You can now set delivery date and coordinate with the buyer.",
-      });
-      fetchRequests();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to accept request",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleRejectRequest = async (requestId: string) => {
-    try {
-      const { error } = await supabase
-        .from("purchase_requests")
-        .update({ status: "rejected" })
-        .eq("id", requestId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Request Rejected",
-        description: "You have rejected the purchase request.",
-      });
-      fetchRequests();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to reject request",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeliveryDateSet = async (requestId: string, date: string) => {
-    try {
-      const { error } = await supabase
-        .from("purchase_requests")
-        .update({ expected_delivery_date: date })
-        .eq("id", requestId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Delivery date set successfully",
-      });
-      
-      setSelectedRequestForDate(null);
-      fetchRequests();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to set delivery date",
-        variant: "destructive",
-      });
-    }
-  };
+    fetchMyRequests();
+  }, [userId]);
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; // Radius of the Earth in kilometers
@@ -217,12 +147,12 @@ export const Requests = (props) => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Purchase Requests</CardTitle>
+          <CardTitle>My Purchase Requests</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2">Loading requests...</span>
+            <span className="ml-2">Loading your requests...</span>
           </div>
         </CardContent>
       </Card>
@@ -233,7 +163,7 @@ export const Requests = (props) => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Purchase Requests</CardTitle>
+          <CardTitle>My Purchase Requests</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8 text-red-600">
@@ -241,7 +171,7 @@ export const Requests = (props) => {
             <span>Error: {error}</span>
           </div>
           <div className="mt-4 text-center">
-            <Button onClick={fetchRequests} variant="outline">
+            <Button onClick={fetchMyRequests} variant="outline">
               Try Again
             </Button>
           </div>
@@ -254,16 +184,16 @@ export const Requests = (props) => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Purchase Requests</CardTitle>
+          <CardTitle>My Purchase Requests</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <Book className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <ShoppingCart className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Purchase Requests</h3>
             <p className="text-gray-600 mb-4">
-              You haven't received any purchase requests for your books yet.
+              You haven't made any purchase requests yet. Browse books to start buying!
             </p>
-            <Button onClick={fetchRequests} variant="outline">
+            <Button onClick={fetchMyRequests} variant="outline">
               Refresh
             </Button>
           </div>
@@ -277,8 +207,8 @@ export const Requests = (props) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Purchase Requests ({requests.length})</span>
-            <Button onClick={fetchRequests} variant="outline" size="sm">
+            <span>My Purchase Requests ({requests.length})</span>
+            <Button onClick={fetchMyRequests} variant="outline" size="sm">
               Refresh
             </Button>
           </CardTitle>
@@ -288,20 +218,20 @@ export const Requests = (props) => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">Book & Buyer</TableHead>
+                  <TableHead className="w-[200px]">Book & Seller</TableHead>
                   <TableHead>Location & Distance</TableHead>
-                  <TableHead>Offer Details</TableHead>
+                  <TableHead>Your Offer</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {requests.map((request) => {
-                  const buyer = request.buyer_latitude && request.buyer_longitude
-                    ? { latitude: Number(request.buyer_latitude), longitude: Number(request.buyer_longitude) }
-                    : null;
                   const seller = request.seller_latitude && request.seller_longitude
                     ? { latitude: Number(request.seller_latitude), longitude: Number(request.seller_longitude) }
+                    : null;
+                  const buyer = request.buyer_latitude && request.buyer_longitude
+                    ? { latitude: Number(request.buyer_latitude), longitude: Number(request.buyer_longitude) }
                     : null;
                   
                   const canShowMap = buyer && seller;
@@ -316,7 +246,7 @@ export const Requests = (props) => {
                           <div className="font-medium">{request.book_title || "Unknown Book"}</div>
                           <div className="text-sm text-gray-600 flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            {request.buyer_name || "Unknown Buyer"}
+                            {request.seller_name || "Unknown Seller"}
                           </div>
                           <div className="text-xs text-gray-500">{new Date(request.created_at).toLocaleDateString()}</div>
                         </div>
@@ -324,10 +254,10 @@ export const Requests = (props) => {
                       
                       <TableCell>
                         <div className="space-y-1">
-                          {request.buyer_location && (
+                          {request.seller_location && (
                             <div className="text-sm flex items-start gap-1">
                               <MapPin className="h-3 w-3 mt-0.5 text-gray-500" />
-                              <span className="text-gray-600">{request.buyer_location}</span>
+                              <span className="text-gray-600">{request.seller_location}</span>
                             </div>
                           )}
                           {distance && (
@@ -336,7 +266,7 @@ export const Requests = (props) => {
                               <span className="text-blue-600 font-medium">{distance} km away</span>
                             </div>
                           )}
-                          {!request.buyer_location && !buyer && (
+                          {!request.seller_location && !seller && (
                             <div className="text-sm text-gray-400">No location provided</div>
                           )}
                         </div>
@@ -355,7 +285,7 @@ export const Requests = (props) => {
                       </TableCell>
                       
                       <TableCell>
-                        {request.status === 'pending' && <Badge variant="secondary">Pending</Badge>}
+                        {request.status === 'pending' && <Badge variant="secondary">Waiting for Response</Badge>}
                         {request.status === 'accepted' && <Badge className="bg-green-100 text-green-800 border-0">Accepted</Badge>}
                         {request.status === 'rejected' && <Badge className="bg-red-100 text-red-800 border-0">Rejected</Badge>}
                         {request.status === 'completed' && <Badge className="bg-blue-100 text-blue-800 border-0">Completed</Badge>}
@@ -363,15 +293,7 @@ export const Requests = (props) => {
                       
                       <TableCell className="text-right">
                         <div className="flex flex-col gap-2">
-                          {/* Primary Actions for Pending Requests */}
-                          {request.status === 'pending' && (
-                            <div className="space-x-2">
-                              <Button size="sm" onClick={() => handleAcceptRequest(request.id)}>Accept</Button>
-                              <Button variant="outline" size="sm" onClick={() => handleRejectRequest(request.id)}>Reject</Button>
-                            </div>
-                          )}
-
-                          {/* Secondary Actions for Accepted/Completed Requests */}
+                          {/* Actions for Accepted/Completed Requests */}
                           {(request.status === 'accepted' || request.status === 'completed') && (
                             <div className="flex flex-wrap gap-1">
                               {/* Chat Button */}
@@ -385,19 +307,6 @@ export const Requests = (props) => {
                                 Chat
                               </Button>
 
-                              {/* Set Delivery Date (only if accepted and no date set) */}
-                              {request.status === 'accepted' && !request.expected_delivery_date && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setSelectedRequestForDate(request.id)}
-                                  className="bg-orange-600 text-white hover:bg-orange-700"
-                                >
-                                  <Calendar className="w-4 h-4 mr-1" />
-                                  Set Date
-                                </Button>
-                              )}
-
                               {/* Delivery Confirmation (only if accepted and date is set) */}
                               {request.status === 'accepted' && request.expected_delivery_date && (
                                 <Button
@@ -407,7 +316,7 @@ export const Requests = (props) => {
                                   className="bg-green-600 text-white hover:bg-green-700"
                                 >
                                   <Package className="w-4 h-4 mr-1" />
-                                  Delivery
+                                  Confirm Receipt
                                 </Button>
                               )}
 
@@ -447,6 +356,18 @@ export const Requests = (props) => {
                               Expected: {new Date(request.expected_delivery_date).toLocaleDateString()}
                             </div>
                           )}
+
+                          {request.status === 'pending' && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Waiting for seller's response
+                            </div>
+                          )}
+
+                          {request.status === 'rejected' && (
+                            <div className="text-xs text-red-500 mt-1">
+                              Request was declined
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -464,7 +385,7 @@ export const Requests = (props) => {
           isOpen={!!selectedRequestForChat}
           onClose={() => setSelectedRequestForChat(null)}
           requestId={selectedRequestForChat}
-          currentUserId={props.userId}
+          currentUserId={userId}
         />
       )}
 
@@ -474,26 +395,11 @@ export const Requests = (props) => {
           isOpen={!!selectedRequestForDelivery}
           onClose={() => setSelectedRequestForDelivery(null)}
           purchaseRequestId={selectedRequestForDelivery}
-          userType="seller"
+          userType="buyer"
           bookTitle={requests.find(r => r.id === selectedRequestForDelivery)?.book_title || ""}
           bookPrice={requests.find(r => r.id === selectedRequestForDelivery)?.book_price || 0}
         />
       )}
-
-      {/* Delivery Date Selector Modal */}
-      {selectedRequestForDate && (
-        <Dialog open={!!selectedRequestForDate} onOpenChange={() => setSelectedRequestForDate(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Set Expected Delivery Date</DialogTitle>
-            </DialogHeader>
-            <DeliveryDateSelector
-              onDateSelect={(date) => handleDeliveryDateSet(selectedRequestForDate, date)}
-              onCancel={() => setSelectedRequestForDate(null)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
-}
+};
