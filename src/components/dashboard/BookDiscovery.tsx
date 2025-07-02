@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -68,29 +69,41 @@ export const BookDiscovery = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const { toast } = useToast();
 
-  // Geolocation
+  // Initialize location on component mount
   useEffect(() => {
     const cachedLocation = locationService.getCachedLocation();
     if (cachedLocation) {
       setUserLocation(cachedLocation);
       setUserCoords({ lat: cachedLocation.latitude, lng: cachedLocation.longitude });
+      console.log('Using cached location:', cachedLocation);
     }
   }, []);
 
-  const handleLocationGranted = (location: LocationData) => {
+  const handleLocationGranted = useCallback((location: LocationData) => {
+    console.log('Location granted:', location);
     setUserLocation(location);
     setUserCoords({ lat: location.latitude, lng: location.longitude });
-    console.log('User location granted:', location);
-  };
+  }, []);
 
-  const handleLocationDenied = () => {
+  const handleLocationDenied = useCallback(() => {
+    console.log('Location denied');
     setUserLocation(null);
     setUserCoords(null);
-    console.log('User location denied');
-  };
+  }, []);
 
-  // Fetch books with advanced filters
-  const fetchBooks = async () => {
+  // Fetch books function with proper error handling
+  const fetchBooks = useCallback(async () => {
+    console.log('Fetching books with filters:', {
+      searchTerm,
+      selectedGenre,
+      selectedYear,
+      selectedISBN,
+      selectedCondition,
+      selectedPriceRange,
+      selectedRadius,
+      userCoords
+    });
+
     setLoading(true);
     try {
       const filters: Record<string, any> = {
@@ -111,7 +124,10 @@ export const BookDiscovery = () => {
 
       const { data: booksData, error: booksError } = await query.order("created_at", { ascending: false });
 
-      if (booksError) throw booksError;
+      if (booksError) {
+        console.error('Books fetch error:', booksError);
+        throw booksError;
+      }
 
       const sellerIds = booksData?.map(book => book.seller_id).filter(Boolean) || [];
       let profilesData: any[] = [];
@@ -122,7 +138,9 @@ export const BookDiscovery = () => {
           .select("id, full_name, location_address, average_rating, review_count")
           .in("id", sellerIds);
         
-        if (!profilesError) {
+        if (profilesError) {
+          console.error('Profiles fetch error:', profilesError);
+        } else {
           profilesData = profiles || [];
         }
       }
@@ -133,7 +151,9 @@ export const BookDiscovery = () => {
       }));
 
       let filteredBooks = booksWithProfiles;
-      if (userCoords && selectedRadius) {
+      
+      // Apply location filter only if we have user coordinates and a selected radius
+      if (userCoords && selectedRadius && selectedRadius !== 9999) {
         filteredBooks = booksWithProfiles.filter((book) => {
           if (book.latitude && book.longitude) {
             const dist = haversineDistance(
@@ -149,7 +169,9 @@ export const BookDiscovery = () => {
       }
       
       setBooks(filteredBooks);
+      console.log('Books fetched successfully:', filteredBooks.length);
 
+      // Update search history
       const filterSummary = [
         searchTerm && `Search: "${searchTerm}"`,
         selectedGenre && `Genre: ${selectedGenre}`,
@@ -157,28 +179,30 @@ export const BookDiscovery = () => {
         selectedISBN && `ISBN: ${selectedISBN}`,
         selectedCondition && `Condition: ${selectedCondition}`,
         selectedPriceRange && `Price: ₹${selectedPriceRange}`,
-        userCoords && selectedRadius && `Within ${selectedRadius}km`
+        userCoords && selectedRadius && selectedRadius !== 9999 && `Within ${selectedRadius}km`
       ]
         .filter(Boolean)
         .join(" | ");
+      
       if (filterSummary) {
         setSearchHistory((prev) => [filterSummary, ...prev.filter((h) => h !== filterSummary)].slice(0, 7));
       }
     } catch (error: any) {
+      console.error('Error fetching books:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch books",
+        description: error.message || "Failed to fetch books. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, selectedGenre, selectedYear, selectedISBN, selectedCondition, selectedPriceRange, selectedRadius, userCoords, toast]);
 
+  // Fetch books when filters change
   useEffect(() => {
     fetchBooks();
-    // eslint-disable-next-line
-  }, [searchTerm, selectedGenre, selectedYear, selectedISBN, selectedCondition, selectedPriceRange, selectedRadius, userCoords]);
+  }, [fetchBooks]);
 
   const handleSaveSearch = () => {
     const label = [
@@ -218,7 +242,25 @@ export const BookDiscovery = () => {
     setSelectedRadius(filters.selectedRadius || 10);
   };
 
-  if (loading) {
+  const handleEnableLocation = async () => {
+    try {
+      const location = await locationService.getCurrentLocation();
+      handleLocationGranted(location);
+      toast({
+        title: "Location Enabled",
+        description: "Your location has been successfully captured for better book discovery.",
+      });
+    } catch (error: any) {
+      console.error('Failed to get location:', error);
+      toast({
+        title: "Location Error",
+        description: error.message || "Failed to get your location. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading && books.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex justify-center items-center">
         <LocationPermissionDialog 
@@ -357,7 +399,7 @@ export const BookDiscovery = () => {
                 />
               </div>
 
-              {/* Location Filter - Updated to show user location status */}
+              {/* Location Filter */}
               <div className="flex items-center space-x-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
                 <MapPin className="h-5 w-5 text-blue-500" />
                 <span className="font-medium text-gray-700">Within</span>
@@ -384,14 +426,7 @@ export const BookDiscovery = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
-                      try {
-                        const location = await locationService.requestLocationPermission();
-                        handleLocationGranted(location);
-                      } catch (error) {
-                        handleLocationDenied();
-                      }
-                    }}
+                    onClick={handleEnableLocation}
                     className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-300"
                   >
                     📍 Enable location
@@ -404,10 +439,11 @@ export const BookDiscovery = () => {
             <div className="flex gap-3 pt-4">
               <Button 
                 onClick={fetchBooks} 
+                disabled={loading}
                 className="flex-1 h-12 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
               >
                 <Search className="h-5 w-5 mr-2" />
-                Search Books
+                {loading ? 'Searching...' : 'Search Books'}
               </Button>
               <Button 
                 variant="outline" 
